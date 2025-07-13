@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Image,
+  ScrollView,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { Bus, Mail, Lock, User } from 'lucide-react-native';
@@ -21,16 +30,16 @@ export default function AuthScreen() {
     if (isLogin) {
       if (!(email || username) || !password) {
         Alert.alert('Error', 'Please enter your email/username and password');
-      return;
-    }
-    setLoading(true);
-    try {
+        return;
+      }
+      setLoading(true);
+      try {
         await login(email || username, password);
-      router.replace('/');
-    } catch (error) {
-      Alert.alert('Error', 'Invalid credentials'+error);
-    } finally {
-      setLoading(false);
+        router.replace('/');
+      } catch (error: any) {
+        Alert.alert('Error', error?.message || 'Invalid credentials');
+      } finally {
+        setLoading(false);
       }
     } else {
       if (!username || !email || !password || !role) {
@@ -39,7 +48,15 @@ export default function AuthScreen() {
       }
       setLoading(true);
       try {
-        await register({ username, email, password, role, firstname, lastname, dof });
+        await register({
+          username,
+          email,
+          password,
+          role,
+          firstname,
+          lastname,
+          dof,
+        });
         Alert.alert('Success', 'Registration successful! Please log in.');
         setIsLogin(true);
       } catch (error: any) {
@@ -50,13 +67,16 @@ export default function AuthScreen() {
     }
   };
 
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Header with Government Branding */}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+    >
       <View style={styles.headerSection}>
         <Image
-          source={{ uri: 'https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+          source={{
+            uri: 'https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg?auto=compress&cs=tinysrgb&w=400',
+          }}
           style={styles.headerImage}
         />
         <View style={styles.headerOverlay}>
@@ -73,7 +93,9 @@ export default function AuthScreen() {
             {isLogin ? 'Welcome Back' : 'Create Account'}
           </Text>
           <Text style={styles.formSubtitle}>
-            {isLogin ? 'Sign in to your account' : 'Register for TNSTC services'}
+            {isLogin
+              ? 'Sign in to your account'
+              : 'Register for TNSTC services'}
           </Text>
 
           {!isLogin && (
@@ -115,18 +137,18 @@ export default function AuthScreen() {
                   />
                 </View>
               </View>
-            <View style={styles.inputContainer}>
+              <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Date of Birth</Text>
-              <View style={styles.inputWrapper}>
-                <User size={20} color="#6B7280" />
-                <TextInput
-                  style={styles.input}
+                <View style={styles.inputWrapper}>
+                  <User size={20} color="#6B7280" />
+                  <TextInput
+                    style={styles.input}
                     placeholder="YYYY-MM-DD"
                     value={dof}
                     onChangeText={setDof}
-                />
+                  />
+                </View>
               </View>
-            </View>
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Role *</Text>
                 <View style={styles.inputWrapper}>
@@ -143,12 +165,16 @@ export default function AuthScreen() {
           )}
 
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>{isLogin ? 'Email or Username' : 'Email Address *'}</Text>
+            <Text style={styles.inputLabel}>
+              {isLogin ? 'Email or Username' : 'Email Address *'}
+            </Text>
             <View style={styles.inputWrapper}>
               <Mail size={20} color="#6B7280" />
               <TextInput
                 style={styles.input}
-                placeholder={isLogin ? 'Enter your email or username' : 'Enter your email'}
+                placeholder={
+                  isLogin ? 'Enter your email or username' : 'Enter your email'
+                }
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -177,7 +203,7 @@ export default function AuthScreen() {
             disabled={loading}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Sign Up')}
+              {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Sign Up'}
             </Text>
           </TouchableOpacity>
 
@@ -186,7 +212,9 @@ export default function AuthScreen() {
             onPress={() => setIsLogin(!isLogin)}
           >
             <Text style={styles.switchText}>
-              {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+              {isLogin
+                ? "Don't have an account? Sign Up"
+                : 'Already have an account? Sign In'}
             </Text>
           </TouchableOpacity>
         </View>

@@ -1,8 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { User } from '@/types';
 
-const API_URL = 'https://safeway-backend-75xq.onrender.com/api/user-auth/conductors';
+const API_URL =
+  'https://safeway-backend-75xq.onrender.com/api/user-auth/conductors';
 
 export default function StaffConductorsScreen() {
   const [conductors, setConductors] = useState<User[]>([]);
@@ -30,9 +38,17 @@ export default function StaffConductorsScreen() {
     <View style={styles.card}>
       <Text style={styles.username}>{item.username}</Text>
       <Text style={styles.meta}>Email: {item.email}</Text>
-      {item.firstname && <Text style={styles.meta}>First Name: {item.firstname}</Text>}
-      {item.lastname && <Text style={styles.meta}>Last Name: {item.lastname}</Text>}
-      {item.created_at && <Text style={styles.meta}>Joined: {new Date(item.created_at).toLocaleDateString('en-IN')}</Text>}
+      {item.firstname && (
+        <Text style={styles.meta}>First Name: {item.firstname}</Text>
+      )}
+      {item.lastname && (
+        <Text style={styles.meta}>Last Name: {item.lastname}</Text>
+      )}
+      {item.created_at && (
+        <Text style={styles.meta}>
+          Joined: {new Date(item.created_at).toLocaleDateString('en-IN')}
+        </Text>
+      )}
     </View>
   );
 
@@ -40,13 +56,21 @@ export default function StaffConductorsScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>All Conductors</Text>
       {loading ? (
-        <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 40 }} />
+        <ActivityIndicator
+          size="large"
+          color="#DC2626"
+          style={{ marginTop: 40 }}
+        />
       ) : (
         <FlatList
           data={conductors}
-          keyExtractor={item => item.user_id.toString()}
+          keyExtractor={(item) => item.user_id.toString()}
           renderItem={renderConductor}
-          ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 40 }}>No conductors found.</Text>}
+          ListEmptyComponent={
+            <Text style={{ textAlign: 'center', marginTop: 40 }}>
+              No conductors found.
+            </Text>
+          }
         />
       )}
     </View>
@@ -62,7 +86,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#2563EB',
+    color: '#DC2626', // changed from blue
     marginBottom: 16,
     textAlign: 'center',
     paddingTop: 25,
@@ -89,4 +113,4 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 2,
   },
-}); 
+});

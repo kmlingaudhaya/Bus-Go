@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 60,
     paddingBottom: 32,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#DC2626', // changed from blue
   },
   avatarContainer: {
     width: 80,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#2563EB',
+    color: '#DC2626', // changed from blue
   },
   userName: {
     fontSize: 24,

@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingTop: 60,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#DC2626', // changed from blue
   },
   title: {
     fontSize: 28,
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#BFDBFE',
+    color: '#FECACA', // changed from #BFDBFE (light blue) to light red
   },
   filterContainer: {
     flexDirection: 'row',
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   filterButtonActive: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#DC2626', // changed from blue
   },
   filterButtonText: {
     fontSize: 14,

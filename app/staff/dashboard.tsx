@@ -1,14 +1,31 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { router } from 'expo-router';
 import Navbar from '@/components/Navbar';
 import { mockNotifications } from '@/data/mockData';
-import { ChartBar as BarChart3, Bus, Users, Ticket, MapPin, TrendingUp, Clock, CircleAlert as AlertCircle } from 'lucide-react-native';
+import {
+  ChartBar as BarChart3,
+  Bus,
+  Users,
+  Ticket,
+  MapPin,
+  TrendingUp,
+  Clock,
+  CircleAlert as AlertCircle,
+} from 'lucide-react-native';
 
 export default function StaffDashboardScreen() {
   const { user } = useAuth();
-  const unreadNotifications = mockNotifications.filter(n => !n.read && n.userId === user?.id).length;
+  const unreadNotifications = mockNotifications.filter(
+    (n) => !n.read && n.userId === user?.user_id
+  ).length;
 
   const stats = [
     { icon: Bus, label: 'Active Buses', value: '45', color: '#DC2626' },
@@ -18,28 +35,60 @@ export default function StaffDashboardScreen() {
   ];
 
   const quickActions = [
-    { icon: Bus, title: 'Add New Bus', subtitle: 'Schedule new route', route: '/staff/buses' },
-    { icon: Ticket, title: 'Offline Booking', subtitle: 'Manual ticket booking', route: '/staff/booking' },
-    { icon: Users, title: 'Manage Waitlist', subtitle: 'Process waiting passengers', route: '/staff/waitlist' },
-    { icon: MapPin, title: 'Track Buses', subtitle: 'Monitor live locations', route: '/staff/tracking' },
+    {
+      icon: Bus,
+      title: 'Add New Bus',
+      subtitle: 'Schedule new route',
+      route: '/staff/buses',
+    },
+    {
+      icon: Ticket,
+      title: 'Offline Booking',
+      subtitle: 'Manual ticket booking',
+      route: '/staff/booking',
+    },
+    {
+      icon: Users,
+      title: 'Manage Waitlist',
+      subtitle: 'Process waiting passengers',
+      route: '/staff/waitlist',
+    },
+    {
+      icon: MapPin,
+      title: 'Track Buses',
+      subtitle: 'Monitor live locations',
+      route: '/staff/tracking',
+    },
   ];
 
   const recentActivities = [
-    { time: '10:30 AM', activity: 'New bus TN 09 Z 5678 added to Chennai-Salem route' },
-    { time: '10:15 AM', activity: '15 passengers moved from waitlist to confirmed' },
-    { time: '09:45 AM', activity: 'Bus TN 11 X 1234 reported 30 minutes delay' },
-    { time: '09:30 AM', activity: 'Offline booking completed for 5 passengers' },
+    {
+      time: '10:30 AM',
+      activity: 'New bus TN 09 Z 5678 added to Chennai-Salem route',
+    },
+    {
+      time: '10:15 AM',
+      activity: '15 passengers moved from waitlist to confirmed',
+    },
+    {
+      time: '09:45 AM',
+      activity: 'Bus TN 11 X 1234 reported 30 minutes delay',
+    },
+    {
+      time: '09:30 AM',
+      activity: 'Offline booking completed for 5 passengers',
+    },
   ];
 
   return (
     <View style={styles.container}>
       <Navbar title="Staff Dashboard" notificationCount={unreadNotifications} />
-      
+
       <ScrollView style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.greeting}>Welcome back,</Text>
-          <Text style={styles.staffName}>{user?.name}</Text>
-          <Text style={styles.employeeId}>Employee ID: {user?.employeeId}</Text>
+          <Text style={styles.staffName}>{user?.username}</Text>
+          <Text style={styles.employeeId}>Employee ID: {user?.user_id}</Text>
         </View>
 
         {/* Statistics */}
@@ -47,7 +96,9 @@ export default function StaffDashboardScreen() {
           {stats.map((stat, index) => (
             <View key={index} style={styles.statCard}>
               <stat.icon size={24} color={stat.color} />
-              <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
+              <Text style={[styles.statValue, { color: stat.color }]}>
+                {stat.value}
+              </Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
           ))}
@@ -201,7 +252,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#DC2626', // changed from blue
     marginBottom: 16,
   },
   actionGrid: {

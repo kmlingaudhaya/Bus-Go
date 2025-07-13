@@ -45,7 +45,7 @@ export default function StaffTripsScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Completed': return '#059669';
-      case 'Ongoing': return '#2563EB';
+      case 'Ongoing': return '#DC2626'; // changed from blue
       case 'Scheduled': return '#EA580C';
       default: return '#64748B';
     }
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#2563EB',
+    color: '#DC2626', // changed from blue
     marginBottom: 16,
     textAlign: 'center',
     paddingTop: 25,

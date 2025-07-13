@@ -1,9 +1,21 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { mockBookings } from '@/data/mockData';
 import { Booking } from '@/types';
-import { MapPin, Clock, Navigation, Phone, CircleAlert as AlertCircle } from 'lucide-react-native';
+import {
+  MapPin,
+  Clock,
+  Navigation,
+  Phone,
+  CircleAlert as AlertCircle,
+} from 'lucide-react-native';
 
 export default function TrackingScreen() {
   const { user } = useAuth();
@@ -13,7 +25,7 @@ export default function TrackingScreen() {
   useEffect(() => {
     // Get active bookings for current user
     const userBookings = mockBookings.filter(
-      booking => booking.userId === user?.id && booking.status === 'confirmed'
+      (booking) => booking.userId === user?.id && booking.status === 'confirmed'
     );
     setActiveBookings(userBookings);
     if (userBookings.length > 0) {
@@ -28,7 +40,9 @@ export default function TrackingScreen() {
           <Text style={styles.title}>Access Denied</Text>
         </View>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>This section is only available for passengers</Text>
+          <Text style={styles.emptyText}>
+            This section is only available for passengers
+          </Text>
         </View>
       </View>
     );
@@ -58,7 +72,7 @@ export default function TrackingScreen() {
     city: 'Coimbatore',
     estimatedArrival: '2h 30m',
     speed: '65 km/h',
-    nextStop: 'Salem'
+    nextStop: 'Salem',
   };
 
   return (
@@ -76,7 +90,7 @@ export default function TrackingScreen() {
             key={booking.id}
             style={[
               styles.tripOption,
-              selectedBooking?.id === booking.id && styles.selectedTrip
+              selectedBooking?.id === booking.id && styles.selectedTrip,
             ]}
             onPress={() => setSelectedBooking(booking)}
           >
@@ -101,7 +115,7 @@ export default function TrackingScreen() {
       {/* Trip Status */}
       <View style={styles.statusContainer}>
         <Text style={styles.sectionTitle}>Trip Status</Text>
-        
+
         <View style={styles.statusCard}>
           <View style={styles.statusRow}>
             <View style={styles.statusIcon}>
@@ -119,7 +133,9 @@ export default function TrackingScreen() {
             </View>
             <View style={styles.statusContent}>
               <Text style={styles.statusLabel}>Estimated Arrival</Text>
-              <Text style={styles.statusValue}>{mockLocation.estimatedArrival}</Text>
+              <Text style={styles.statusValue}>
+                {mockLocation.estimatedArrival}
+              </Text>
             </View>
           </View>
 
@@ -194,7 +210,7 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingTop: 60,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#DC2626', // changed from blue
   },
   title: {
     fontSize: 28,
@@ -204,7 +220,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#BFDBFE',
+    color: '#FECACA', // changed from #BFDBFE (light blue) to light red
   },
   emptyContainer: {
     flex: 1,
@@ -244,8 +260,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedTrip: {
-    borderColor: '#2563EB',
-    backgroundColor: '#EFF6FF',
+    borderColor: '#DC2626', // changed from blue
+    backgroundColor: '#FEF2F2', // light red background
   },
   tripRoute: {
     fontSize: 16,

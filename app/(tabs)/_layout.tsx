@@ -51,7 +51,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="tracking"
+        name="track"
         options={{
           title: 'Track Trip',
           tabBarIcon: ({ size, color }) => (
