@@ -1,64 +1,113 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
-import { User as UserIcon, Mail, Shield, Bell, CreditCard, CircleHelp as HelpCircle, Settings, Star, LogOut } from 'lucide-react-native';
+import {
+  User as UserIcon,
+  Mail,
+  Shield,
+  Bell,
+  CreditCard,
+  CircleHelp as HelpCircle,
+  Settings,
+  Star,
+  LogOut,
+} from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation();
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/auth');
-          }
-        }
-      ]
-    );
+    Alert.alert(t('logout'), t('logout_confirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('logout'),
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/auth');
+        },
+      },
+    ]);
+  };
+
+  // Language Switcher
+  const languages = [
+    { code: 'en', label: 'English' },
+    { code: 'ta', label: 'தமிழ்' },
+  ];
+  const currentLang = i18n.language;
+  const handleChangeLanguage = (lang: string) => {
+    i18n.changeLanguage(lang);
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'passenger': return '#2563EB';
-      case 'conductor': return '#059669';
-      case 'staff': return '#EA580C';
-      default: return '#64748B';
+      case 'passenger':
+        return '#2563EB';
+      case 'conductor':
+        return '#059669';
+      case 'staff':
+        return '#EA580C';
+      default:
+        return '#64748B';
     }
   };
 
   const getRoleBackground = (role: string) => {
     switch (role) {
-      case 'passenger': return '#EFF6FF';
-      case 'conductor': return '#ECFDF5';
-      case 'staff': return '#FFF7ED';
-      default: return '#F8FAFC';
+      case 'passenger':
+        return '#EFF6FF';
+      case 'conductor':
+        return '#ECFDF5';
+      case 'staff':
+        return '#FFF7ED';
+      default:
+        return '#F8FAFC';
     }
   };
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'passenger': return 'Passenger';
-      case 'conductor': return 'Conductor';
-      case 'staff': return 'Staff';
-      default: return 'User';
+      case 'passenger':
+        return t('role_passenger');
+      case 'conductor':
+        return t('role_conductor');
+      case 'staff':
+        return t('role_staff');
+      default:
+        return t('role_user');
     }
   };
 
   const menuItems = [
-    { icon: Bell, label: 'Notifications', subtitle: 'Manage your alerts' },
-    { icon: CreditCard, label: 'Payment Methods', subtitle: 'Cards and wallets' },
-    { icon: Star, label: 'Rate & Review', subtitle: 'Share your experience' },
-    { icon: HelpCircle, label: 'Help & Support', subtitle: 'Get assistance' },
-    { icon: Settings, label: 'Settings', subtitle: 'App preferences' },
-    { icon: Shield, label: 'Privacy Policy', subtitle: 'Data protection' },
+    { icon: Bell, label: t('notifications'), subtitle: t('manage_alerts') },
+    {
+      icon: CreditCard,
+      label: t('payment_methods'),
+      subtitle: t('cards_wallets'),
+    },
+    { icon: Star, label: t('rate_review'), subtitle: t('share_experience') },
+    {
+      icon: HelpCircle,
+      label: t('help_support'),
+      subtitle: t('get_assistance'),
+    },
+    { icon: Settings, label: t('settings'), subtitle: t('app_preferences') },
+    {
+      icon: Shield,
+      label: t('privacy_policy'),
+      subtitle: t('data_protection'),
+    },
   ];
 
   return (
@@ -66,35 +115,65 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
           <Text style={styles.avatarText}>
-            {user?.firstname?.charAt(0)?.toUpperCase() || user?.username?.charAt(0)?.toUpperCase() || 'U'}
+            {user?.firstname?.charAt(0)?.toUpperCase() ||
+              user?.username?.charAt(0)?.toUpperCase() ||
+              'U'}
           </Text>
         </View>
         <Text style={styles.userName}>{user?.firstname || user?.username}</Text>
-        <View style={[
-          styles.roleBadge,
-          { backgroundColor: getRoleBackground(user?.role || 'user') }
-        ]}>
-          <Text style={[
-            styles.roleText,
-            { color: getRoleColor(user?.role || 'user') }
-          ]}>
+        <View
+          style={[
+            styles.roleBadge,
+            { backgroundColor: getRoleBackground(user?.role || 'user') },
+          ]}
+        >
+          <Text
+            style={[
+              styles.roleText,
+              { color: getRoleColor(user?.role || 'user') },
+            ]}
+          >
             {getRoleLabel(user?.role || 'user')}
           </Text>
         </View>
+      </View>
+
+      {/* Language Switcher */}
+      <View style={styles.languageSwitcher}>
+        {languages.map((lang) => (
+          <TouchableOpacity
+            key={lang.code}
+            style={[
+              styles.langButton,
+              currentLang === lang.code && styles.langButtonActive,
+            ]}
+            onPress={() => handleChangeLanguage(lang.code)}
+            disabled={currentLang === lang.code}
+          >
+            <Text
+              style={[
+                styles.langButtonText,
+                currentLang === lang.code && styles.langButtonTextActive,
+              ]}
+            >
+              {lang.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={styles.infoSection}>
         <View style={styles.infoRow}>
           <UserIcon size={20} color="#64748B" />
           <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Username</Text>
+            <Text style={styles.infoLabel}>{t('username')}</Text>
             <Text style={styles.infoValue}>{user?.username}</Text>
           </View>
         </View>
         <View style={styles.infoRow}>
           <Mail size={20} color="#64748B" />
           <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Email</Text>
+            <Text style={styles.infoLabel}>{t('email')}</Text>
             <Text style={styles.infoValue}>{user?.email}</Text>
           </View>
         </View>
@@ -102,16 +181,16 @@ export default function ProfileScreen() {
           <View style={styles.infoRow}>
             <UserIcon size={20} color="#64748B" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>First Name</Text>
+              <Text style={styles.infoLabel}>{t('first_name')}</Text>
               <Text style={styles.infoValue}>{user.firstname}</Text>
             </View>
           </View>
         )}
         {user?.lastname && (
-        <View style={styles.infoRow}>
+          <View style={styles.infoRow}>
             <UserIcon size={20} color="#64748B" />
-          <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Last Name</Text>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>{t('last_name')}</Text>
               <Text style={styles.infoValue}>{user.lastname}</Text>
             </View>
           </View>
@@ -120,17 +199,19 @@ export default function ProfileScreen() {
           <View style={styles.infoRow}>
             <UserIcon size={20} color="#64748B" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Date of Birth</Text>
+              <Text style={styles.infoLabel}>{t('date_of_birth')}</Text>
               <Text style={styles.infoValue}>{user.dof}</Text>
+            </View>
           </View>
-        </View>
         )}
         {user?.created_at && (
-        <View style={styles.infoRow}>
+          <View style={styles.infoRow}>
             <UserIcon size={20} color="#64748B" />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Member Since</Text>
-              <Text style={styles.infoValue}>{new Date(user.created_at).toLocaleDateString('en-IN')}</Text>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>{t('member_since')}</Text>
+              <Text style={styles.infoValue}>
+                {new Date(user.created_at).toLocaleDateString('en-IN')}
+              </Text>
             </View>
           </View>
         )}
@@ -139,8 +220,10 @@ export default function ProfileScreen() {
           <View style={styles.infoRow}>
             <UserIcon size={20} color="#64748B" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Conductor Info</Text>
-              <Text style={styles.infoValue}>Special info for conductors</Text>
+              <Text style={styles.infoLabel}>{t('conductor_info')}</Text>
+              <Text style={styles.infoValue}>
+                {t('special_info_conductor')}
+              </Text>
             </View>
           </View>
         )}
@@ -148,10 +231,10 @@ export default function ProfileScreen() {
           <View style={styles.infoRow}>
             <UserIcon size={20} color="#64748B" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Staff Info</Text>
-              <Text style={styles.infoValue}>Special info for staff</Text>
+              <Text style={styles.infoLabel}>{t('staff_info')}</Text>
+              <Text style={styles.infoValue}>{t('special_info_staff')}</Text>
+            </View>
           </View>
-        </View>
         )}
       </View>
 
@@ -174,12 +257,12 @@ export default function ProfileScreen() {
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <LogOut size={20} color="#DC2626" />
-        <Text style={styles.logoutText}>Logout</Text>
+        <Text style={styles.logoutText}>{t('logout')}</Text>
       </TouchableOpacity>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Bus Ticketing App v1.0.0</Text>
-        <Text style={styles.footerSubtext}>Made with ❤️ for Tamil Nadu</Text>
+        <Text style={styles.footerText}>{t('app_version')}</Text>
+        <Text style={styles.footerSubtext}>{t('made_with_love')}</Text>
       </View>
     </ScrollView>
   );
@@ -341,5 +424,34 @@ const styles = StyleSheet.create({
   footerSubtext: {
     fontSize: 12,
     color: '#94A3B8',
+  },
+  languageSwitcher: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+    gap: 8,
+  },
+  langButton: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  langButtonActive: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
+  },
+  langButtonText: {
+    color: '#1E293B',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  langButtonTextActive: {
+    color: '#fff',
   },
 });

@@ -17,6 +17,8 @@ import { Trip, StopStatus } from '@/types';
 import * as Location from 'expo-location';
 import type { LocationObjectCoords } from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { conductorAPI, Trip as APITrip } from '@/services/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -38,11 +40,11 @@ interface GPSPoint {
 
 interface DetectedStop {
   id: string;
-  latitude: number;
-  longitude: number;
-  placeName: string;
-  startTime: number;
-  endTime: number;
+    latitude: number;
+    longitude: number;
+    placeName: string;
+    startTime: number;
+    endTime: number;
   duration: number; // minutes
   address?: string;
 }
@@ -157,12 +159,14 @@ function calculateSpeed(point1: GPSPoint, point2: GPSPoint): number {
 export default function ConductorTrackingScreen() {
   // -------- State --------
   const { user } = useAuth();
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [selectedTrip, setSelectedTrip] = useState<APITrip | null>(null);
+  const [allConductorTrips, setAllConductorTrips] = useState<APITrip[]>([]);
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState<LocationObjectCoords | null>(null);
   const [currentAddress, setCurrentAddress] = useState<string>('');
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   // Trip management
@@ -189,6 +193,7 @@ export default function ConductorTrackingScreen() {
     null
   );
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [gpsIntervalCount, setGpsIntervalCount] = useState(0);
 
   // Storage keys
   const STORAGE_KEYS = {
@@ -206,6 +211,104 @@ export default function ConductorTrackingScreen() {
       isMounted.current = false;
     };
   }, []);
+
+  // Load all conductor trips and find active trip
+  useEffect(() => {
+    if (user?.username) {
+      loadConductorTrips();
+    }
+  }, [user]);
+
+  const loadConductorTrips = async () => {
+    if (!user?.username) return;
+
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        conductorAPI.setToken(token);
+      }
+
+      // Load all conductor trips
+      const trips = await conductorAPI.getConductorTrips(user.username);
+      console.log('📋 All conductor trips:', trips);
+
+      // Filter to only show in-progress trips
+      const inProgressTrips = trips.filter(
+        (trip) => trip.trip_status === 'in_progress'
+      );
+
+      setAllConductorTrips(inProgressTrips);
+      console.log('📋 In-progress trips:', inProgressTrips.length);
+
+      // Find the active trip (first in-progress trip)
+      const activeTrip = inProgressTrips.length > 0 ? inProgressTrips[0] : null;
+
+      if (activeTrip) {
+        setSelectedTrip(activeTrip);
+        console.log('📋 Found in-progress trip:', activeTrip.trip_id);
+        console.log('   Trip status:', activeTrip.trip_status);
+        console.log('   Trip started state:', tripStarted);
+        console.log('   Waiting for conductor to start GPS tracking...');
+      } else {
+        console.log('📋 No in-progress trips found');
+        setSelectedTrip(null);
+      }
+    } catch (error: any) {
+      console.error('Error loading conductor trips:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper: Store GPS data in database
+  const storeGPSData = async (gpsPoint: GPSPoint) => {
+    if (!selectedTrip) {
+      console.log('❌ No selected trip, skipping GPS data storage');
+      return;
+    }
+
+    try {
+      console.log('🔄 Attempting to store GPS data...');
+      console.log('   Selected Trip ID:', selectedTrip.trip_id);
+      console.log('   GPS Point:', gpsPoint);
+
+      // Calculate speed if we have previous points
+      let speed = 0;
+      if (gpsPoints.length > 0) {
+        const prevPoint = gpsPoints[gpsPoints.length - 1];
+        speed = calculateSpeed(prevPoint, gpsPoint);
+      }
+
+      const gpsData = {
+        vehicle_id: selectedTrip.vehicle_id,
+        trip_id: selectedTrip.trip_id,
+        latitude: gpsPoint.latitude,
+        longitude: gpsPoint.longitude,
+        speed: speed,
+        heading: 0, // We can calculate this later if needed
+        address: currentAddress, // Include the current address
+      };
+
+      console.log('📤 Sending GPS data to backend:', gpsData);
+
+      // Store GPS data in trips table using API
+      const result = await conductorAPI.storeGPSData(gpsData);
+
+      console.log('✅ GPS data stored successfully in trips table');
+      console.log('   Backend response:', result);
+      console.log('   Trip ID:', selectedTrip.trip_id);
+      console.log(
+        '   Coordinates:',
+        `${gpsPoint.latitude}, ${gpsPoint.longitude}`
+      );
+      console.log('   Speed:', speed.toFixed(2), 'km/h');
+      console.log('   Timestamp:', new Date(gpsPoint.timestamp).toISOString());
+    } catch (error: any) {
+      console.error('❌ Error storing GPS data:', error);
+      console.error('   Error details:', error?.message || 'Unknown error');
+    }
+  };
 
   // Helper: Get address from coordinates using reverse geocoding
   const getAddressFromCoords = async (
@@ -290,7 +393,7 @@ export default function ConductorTrackingScreen() {
       if (distance < 50) {
         if (!currentStop) {
           currentStop = {
-            id: Date.now().toString(),
+      id: Date.now().toString(),
             latitude: currentPoint.latitude,
             longitude: currentPoint.longitude,
             placeName: `Stop ${stops.length + 1}`,
@@ -402,17 +505,45 @@ export default function ConductorTrackingScreen() {
 
   // Helper: Start GPS tracking
   const startGPSTracking = () => {
+    console.log('🔄 Starting GPS tracking...');
+    console.log('   GPS Interval:', GPS_INTERVAL_SECONDS, 'seconds');
+    console.log('   Selected Trip:', selectedTrip?.trip_id);
+    console.log('   Trip Started:', tripStarted);
+    console.log('   Tracking:', tracking);
+
     if (intervalRef.current) {
+      console.log('🔄 Clearing existing interval...');
       clearInterval(intervalRef.current);
     }
 
     intervalRef.current = setInterval(async () => {
+      const newCount = gpsIntervalCount + 1;
+      setGpsIntervalCount(newCount);
+      console.log(
+        '⏰ GPS tracking interval triggered... (Count:',
+        newCount,
+        ')'
+      );
+      console.log('   Selected Trip:', selectedTrip?.trip_id);
+      console.log('   Trip Started:', tripStarted);
+      console.log('   Is Mounted:', isMounted.current);
+      console.log('   Interval ID:', intervalRef.current);
+
       try {
+        console.log('📍 Getting current location...');
         const loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
+        console.log('📍 Location obtained:', {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          timestamp: loc.timestamp,
+        });
 
-        if (!isMounted.current) return;
+        if (!isMounted.current) {
+          console.log('❌ Component not mounted, skipping GPS update');
+          return;
+        }
 
         const newPoint: GPSPoint = {
           latitude: loc.coords.latitude,
@@ -421,19 +552,64 @@ export default function ConductorTrackingScreen() {
           accuracy: loc.coords.accuracy || 0,
         };
 
+        console.log('📍 New GPS point created:', newPoint);
         setGpsPoints((prev) => [...prev, newPoint]);
         setLocation(loc.coords);
 
         // Get address for display
+        console.log('📍 Getting address from coordinates...');
         const address = await getAddressFromCoords(
           loc.coords.latitude,
           loc.coords.longitude
         );
         setCurrentAddress(address);
+        console.log('📍 Address obtained:', address);
+
+        // Update conductor location in trips table every 10 seconds
+        console.log('📍 Checking conditions for backend update...');
+        console.log('   Selected Trip exists:', !!selectedTrip);
+        console.log('   Trip Started:', tripStarted);
+
+        if (selectedTrip && tripStartedRef.current) {
+          console.log('✅ Conditions met, updating backend...');
+          try {
+            console.log('📍 Updating conductor location in trips table...');
+            console.log('   Trip ID:', selectedTrip.trip_id);
+            console.log(
+              '   Coordinates:',
+              `${loc.coords.latitude}, ${loc.coords.longitude}`
+            );
+            console.log('   Address:', address);
+            console.log('   Timestamp:', new Date().toISOString());
+
+            await conductorAPI.updateConductorLocation({
+              trip_id: selectedTrip.trip_id,
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+              address: address,
+            });
+            console.log('✅ Conductor location updated successfully');
+
+            // Also store GPS data in trips table every 10 seconds
+            console.log(
+              `🚀 Sending GPS data to backend for trip ${selectedTrip.trip_id}:`,
+              newPoint
+            );
+            await storeGPSData(newPoint);
+          } catch (error) {
+            console.error('❌ Failed to update location in backend:', error);
+          }
+        } else {
+          console.log('❌ Conditions not met for backend update:');
+          console.log('   Selected Trip:', selectedTrip?.trip_id);
+          console.log('   Trip Started:', tripStarted);
+        }
       } catch (error) {
-        console.error('GPS tracking error:', error);
+        console.error('❌ GPS tracking error:', error);
       }
     }, GPS_INTERVAL_SECONDS * 1000);
+
+    console.log('✅ GPS tracking interval set successfully');
   };
 
   // Helper: Stop GPS tracking and analyze trip
@@ -549,27 +725,79 @@ export default function ConductorTrackingScreen() {
 
   // Helper: Start trip
   const startTrip = async () => {
+    if (!selectedTrip) {
+      Alert.alert('Error', 'No trip selected. Please select a trip first.');
+        return;
+      }
+
     const granted = await requestLocationPermissions();
     if (!granted) return;
 
-    setTripStarted(true);
-    setTracking(true);
-    startGPSTracking();
-    Alert.alert(
-      'Trip Started',
-      'GPS tracking has begun. Your location will be recorded every 10 seconds.'
-    );
+    try {
+      // Update trip status to in_progress
+      await conductorAPI.updateTripStatus(selectedTrip.trip_id, 'in_progress');
+
+      setTripStarted(true);
+      setTracking(true);
+      startGPSTracking();
+      Alert.alert(
+        'Trip Started',
+        'GPS tracking has begun. Your location will be recorded every 10 seconds and stored in the database.'
+      );
+    } catch (error: any) {
+      console.error('Error starting trip:', error);
+      Alert.alert('Error', 'Failed to start trip. Please try again.');
+    }
   };
 
   // Helper: End trip
-  const endTrip = () => {
-    stopGPSTracking();
-    setTripStarted(false);
-    setTracking(false);
-    Alert.alert(
-      'Trip Ended',
-      'Trip analysis is ready. Check the analytics below.'
-    );
+  const endTrip = async () => {
+    if (!selectedTrip) return;
+
+    try {
+      console.log('🛑 Ending trip...');
+      console.log('   Trip ID:', selectedTrip.trip_id);
+      console.log('   Total GPS Points:', gpsPoints.length);
+
+      // GPS data is already being stored every 10 seconds in the trips table
+      // No need to store it again here since it's already updated in real-time
+      if (gpsPoints.length > 0) {
+        console.log(
+          '📊 GPS data has been continuously updated in trips table during the trip'
+        );
+        console.log('   Final GPS point count:', gpsPoints.length);
+      }
+
+      // Update trip status to completed
+      console.log('🛑 Calling API to update trip status to completed...');
+      console.log('   Trip ID:', selectedTrip.trip_id);
+
+      const statusUpdateResult = await conductorAPI.updateTripStatus(
+        selectedTrip.trip_id,
+        'completed'
+      );
+      console.log('✅ Trip status update API response:', statusUpdateResult);
+
+      // Update local state to reflect completed status
+      setSelectedTrip((prev) =>
+        prev ? { ...prev, trip_status: 'completed' } : null
+      );
+      setAllConductorTrips((prev) =>
+        prev.filter((trip) => trip.trip_id !== selectedTrip.trip_id)
+      );
+
+      stopGPSTracking();
+      setTripStarted(false);
+      setTracking(false);
+
+      Alert.alert(
+        'Trip Ended',
+        'Trip completed successfully. All GPS data has been stored for analysis.'
+      );
+    } catch (error: any) {
+      console.error('Error ending trip:', error);
+      Alert.alert('Error', 'Failed to end trip. Please try again.');
+    }
   };
 
   // Helper: Get status color
@@ -587,6 +815,91 @@ export default function ConductorTrackingScreen() {
         return '#D1D5DB';
     }
   }
+
+  // Helper: Get trip status color
+  function getTripStatusColor(status: string) {
+    switch (status) {
+      case 'pending':
+        return '#FEF3C7';
+      case 'scheduled':
+        return '#D1FAE5';
+      case 'in_progress':
+        return '#DBEAFE';
+      case 'completed':
+        return '#F3F4F6';
+      case 'cancelled':
+        return '#FEE2E2';
+      default:
+        return '#F3F4F6';
+    }
+  }
+
+  // Helper: Handle start trip
+  const handleStartTrip = async (trip: APITrip) => {
+    try {
+      console.log('🚀 Starting new trip...');
+      console.log('   Trip ID:', trip.trip_id);
+      console.log('   Vehicle ID:', trip.vehicle_id);
+
+      // Update trip status to in_progress
+      await conductorAPI.updateTripStatus(trip.trip_id, 'in_progress');
+
+      // Update local state
+      setAllConductorTrips((prev) =>
+        prev.map((t) =>
+          t.trip_id === trip.trip_id ? { ...t, trip_status: 'in_progress' } : t
+        )
+      );
+
+      // Clear previous GPS data and set as selected trip
+      console.log('🔄 Setting up GPS tracking...');
+      console.log('   Previous tripStarted:', tripStarted);
+      console.log('   Previous tracking:', tracking);
+      setGpsPoints([]);
+      setSelectedTrip(trip);
+      setTripStarted(true);
+      setTracking(true);
+      console.log('🔄 Starting GPS tracking function...');
+      startGPSTracking();
+      console.log('🔄 GPS tracking setup complete');
+      console.log('   New tripStarted should be: true');
+      console.log('   New tracking should be: true');
+
+      console.log('✅ Trip started successfully');
+      Alert.alert(
+        'Trip Started',
+        'GPS tracking has begun. Your location will be updated every 10 seconds.'
+      );
+    } catch (error: any) {
+      console.error('Error starting trip:', error);
+      Alert.alert('Error', 'Failed to start trip. Please try again.');
+    }
+  };
+
+  // Helper: Handle start GPS tracking for in-progress trip
+  const handleStartGPSTracking = async (trip: APITrip) => {
+    try {
+      console.log('🚀 Starting GPS tracking for in-progress trip...');
+      console.log('   Trip ID:', trip.trip_id);
+      console.log('   Vehicle ID:', trip.vehicle_id);
+
+      // Clear previous GPS data and set as selected trip
+      setGpsPoints([]);
+      setSelectedTrip(trip);
+      setTripStarted(true);
+      setTracking(true);
+      startGPSTracking();
+
+      console.log('✅ GPS tracking started successfully');
+      Alert.alert(
+        'GPS Tracking Started',
+        'GPS tracking has begun. Your location will be updated every 10 seconds.'
+      );
+    } catch (error: any) {
+      console.error('Error starting GPS tracking:', error);
+      Alert.alert('Error', 'Failed to start GPS tracking. Please try again.');
+    }
+  };
 
   // Load offline data on mount
   useEffect(() => {
@@ -665,6 +978,26 @@ export default function ConductorTrackingScreen() {
     );
   };
 
+  // After: const [tripStarted, setTripStarted] = useState(false);
+  const tripStartedRef = useRef(tripStarted);
+  useEffect(() => {
+    tripStartedRef.current = tripStarted;
+  }, [tripStarted]);
+
+  const { t, language } = useLanguage();
+
+  if (loading) {
+  return (
+    <View style={styles.container}>
+      <ErrorBanner />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#DC2626" />
+          <Text style={styles.loadingText}>Loading trip information...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ErrorBanner />
@@ -673,7 +1006,7 @@ export default function ConductorTrackingScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Trip Tracking</Text>
         <Text style={styles.headerSubtitle}>
-          {selectedTrip ? `Trip #${selectedTrip.id}` : 'No active trip'}
+          {selectedTrip ? t('trip_number').replace('{id}', String(selectedTrip.trip_id)) : t('no_active_trip')}
         </Text>
         <View
           style={[
@@ -691,6 +1024,152 @@ export default function ConductorTrackingScreen() {
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
+        {/* In-Progress Trips Section */}
+        <View style={styles.tripsListContainer}>
+          <Text style={styles.sectionTitle}>📋 My In-Progress Trips</Text>
+          {allConductorTrips.length === 0 ? (
+            <View style={styles.noTripsContainer}>
+              <Text style={styles.noTripsText}>{t('no_in_progress_trips')}</Text>
+              <Text style={styles.noTripsSubtext}>{t('no_in_progress_trips_subtext')}</Text>
+            </View>
+          ) : (
+            allConductorTrips.map((trip) => (
+              <View
+                key={trip.trip_id}
+                style={[
+                  styles.tripCard,
+                  trip.trip_status === 'in_progress' && styles.activeTripCard,
+                ]}
+              >
+                <View style={styles.tripCardHeader}>
+                  <View style={styles.tripCardInfo}>
+                    <Text style={styles.tripCardRoute}>
+                      {t('city_' + trip.start_location)} → {t('city_' + trip.end_location)}
+                    </Text>
+                    <Text style={styles.tripCardVehicle}>
+                      {t('vehicle')}: {trip.vehicle_number || t('na')}
+                    </Text>
+                    <Text style={styles.tripCardTime}>
+                      {new Date(trip.start_time).toLocaleString(language === 'ta' ? 'ta-IN' : 'en-IN')}
+                    </Text>
+                  </View>
+                  <View
+                  style={[
+                      styles.tripStatusBadge,
+                      { backgroundColor: getTripStatusColor(trip.trip_status) },
+                  ]}
+                >
+                    <Text style={styles.tripStatusText}>
+                      {t('trip_status_' + trip.trip_status)}
+                </Text>
+                  </View>
+                </View>
+
+                {trip.trip_status === 'in_progress' && !tripStarted && (
+              <TouchableOpacity
+                    style={styles.startGPSTrackingButton}
+                    onPress={() => handleStartGPSTracking(trip)}
+                  >
+                    <Text style={styles.startGPSTrackingButtonText}>
+                      🚀 {t('start_gps_tracking')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {trip.trip_status === 'in_progress' && tripStarted && (
+                  <View style={styles.activeTripIndicator}>
+                    <Text style={styles.activeTripText}>
+                      🟢 {t('gps_tracking_active')}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Trip Details Section */}
+        {selectedTrip ? (
+          <View style={styles.tripDetailsContainer}>
+            <Text style={styles.sectionTitle}>🚌 Trip Details</Text>
+            <View style={styles.tripInfo}>
+              <View style={styles.tripRoute}>
+                <Text style={styles.tripRouteLabel}>Route:</Text>
+                <Text style={styles.tripRouteValue}>
+                  {t('city_' + selectedTrip.start_location)} → {t('city_' + selectedTrip.end_location)}
+                </Text>
+              </View>
+
+              <View style={styles.tripDetailsRow}>
+                <View style={styles.tripDetailItem}>
+                  <Text style={styles.tripDetailLabel}>Vehicle:</Text>
+                  <Text style={styles.tripDetailValue}>
+                    {selectedTrip.vehicle_number || t('na')}
+                  </Text>
+                </View>
+
+                <View style={styles.tripDetailItem}>
+                  <Text style={styles.tripDetailLabel}>Status:</Text>
+                <Text
+                  style={[
+                      styles.tripDetailValue,
+                      {
+                        color:
+                          selectedTrip.trip_status === 'in_progress'
+                            ? '#10B981'
+                            : '#F59E0B',
+                      },
+                    ]}
+                  >
+                    {t('trip_status_' + selectedTrip.trip_status)}
+                </Text>
+                </View>
+              </View>
+
+              <View style={styles.tripDetailsRow}>
+                <View style={styles.tripDetailItem}>
+                  <Text style={styles.tripDetailLabel}>Start Time:</Text>
+                  <Text style={styles.tripDetailValue}>
+                    {new Date(selectedTrip.start_time).toLocaleString(language === 'ta' ? 'ta-IN' : 'en-IN')}
+                </Text>
+            </View>
+
+                {selectedTrip.driver_first_name && (
+                  <View style={styles.tripDetailItem}>
+                    <Text style={styles.tripDetailLabel}>Driver:</Text>
+                    <Text style={styles.tripDetailValue}>
+                      {selectedTrip.driver_first_name}{' '}
+                      {selectedTrip.driver_last_name}
+                    </Text>
+          </View>
+        )}
+              </View>
+
+              {selectedTrip.distance_travelled && (
+                <View style={styles.tripDetailsRow}>
+                  <View style={styles.tripDetailItem}>
+                    <Text style={styles.tripDetailLabel}>Distance:</Text>
+                    <Text style={styles.tripDetailValue}>
+                      {selectedTrip.distance_travelled} km
+              </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        ) : (
+          <View style={styles.noTripContainer}>
+            <Text style={styles.noTripTitle}>{t('no_active_trip')}</Text>
+            <Text style={styles.noTripSubtext}>{t('no_active_trip_subtext')}</Text>
+            <TouchableOpacity
+              style={styles.refreshTripButton}
+              onPress={loadConductorTrips}
+            >
+              <Text style={styles.refreshTripButtonText}>{t('refresh_trips')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Current Location Section */}
         <View style={styles.locationContainer}>
           <Text style={styles.sectionTitle}>📍 Current Location</Text>
@@ -706,7 +1185,7 @@ export default function ConductorTrackingScreen() {
                 <Text style={styles.locationValue}>
                   {location.latitude.toFixed(6)},{' '}
                   {location.longitude.toFixed(6)}
-                </Text>
+              </Text>
               </View>
 
               <TouchableOpacity
@@ -714,13 +1193,13 @@ export default function ConductorTrackingScreen() {
                 onPress={getCurrentLocation}
               >
                 <Text style={styles.refreshButtonText}>
-                  🔄 Refresh Location
+                  🔄 {t('refresh_location')}
                 </Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.locationPlaceholder}>
-              <Text style={styles.locationText}>Getting Location...</Text>
+              <Text style={styles.locationText}>{t('getting_location')}</Text>
               <ActivityIndicator
                 size="large"
                 color="#DC2626"
@@ -734,32 +1213,36 @@ export default function ConductorTrackingScreen() {
         {selectedTrip && (
           <View style={styles.statusContainer}>
             <Text style={styles.sectionTitle}>Trip Status</Text>
-            <View style={styles.statusGrid}>
-              <View style={styles.statusItem}>
+                <View style={styles.statusGrid}>
+                  <View style={styles.statusItem}>
                 <Text style={styles.statusLabel}>Status</Text>
-                <Text style={styles.statusValue}>
-                  {tripStarted ? '🟢 Active' : '⚪ Inactive'}
-                </Text>
-              </View>
-              <View style={styles.statusItem}>
+                    <Text style={styles.statusValue}>
+                  {tripStarted ? t('active_status') : t('inactive_status')}
+                    </Text>
+                  </View>
+                  <View style={styles.statusItem}>
                 <Text style={styles.statusLabel}>GPS Points</Text>
                 <Text style={styles.statusValue}>{gpsPoints.length}</Text>
-              </View>
-              <View style={styles.statusItem}>
+                  </View>
+                  <View style={styles.statusItem}>
+                <Text style={styles.statusLabel}>Interval Count</Text>
+                <Text style={styles.statusValue}>{gpsIntervalCount}</Text>
+                  </View>
+                  <View style={styles.statusItem}>
                 <Text style={styles.statusLabel}>Detected Stops</Text>
                 <Text style={styles.statusValue}>{detectedStops.length}</Text>
-              </View>
-              <View style={styles.statusItem}>
-                <Text style={styles.statusLabel}>Duration</Text>
-                <Text style={styles.statusValue}>
+                </View>
+                <View style={styles.statusItem}>
+                  <Text style={styles.statusLabel}>Duration</Text>
+                  <Text style={styles.statusValue}>
                   {tripStarted && gpsPoints.length > 0
-                    ? `${Math.round(
+                      ? `${Math.round(
                         (Date.now() - gpsPoints[0].timestamp) / (1000 * 60)
-                      )} min`
-                    : '0 min'}
-                </Text>
-              </View>
-            </View>
+                        )} min`
+                      : '0 min'}
+                  </Text>
+                </View>
+                </View>
           </View>
         )}
 
@@ -773,66 +1256,66 @@ export default function ConductorTrackingScreen() {
                 <Text style={styles.analyticsValue}>
                   {(tripAnalytics.totalDistance / 1000).toFixed(2)} km
                 </Text>
-              </View>
+            </View>
               <View style={styles.analyticsItem}>
                 <Text style={styles.analyticsLabel}>Average Speed</Text>
                 <Text style={styles.analyticsValue}>
                   {tripAnalytics.averageSpeed.toFixed(1)} km/h
-                </Text>
-              </View>
+                  </Text>
+                </View>
               <View style={styles.analyticsItem}>
                 <Text style={styles.analyticsLabel}>Max Speed</Text>
                 <Text style={styles.analyticsValue}>
                   {tripAnalytics.maxSpeed.toFixed(1)} km/h
-                </Text>
-              </View>
+                  </Text>
+                </View>
               <View style={styles.analyticsItem}>
                 <Text style={styles.analyticsLabel}>Total Stops</Text>
                 <Text style={styles.analyticsValue}>
                   {tripAnalytics.totalStops}
-                </Text>
-              </View>
+                  </Text>
+                </View>
               <View style={styles.analyticsItem}>
                 <Text style={styles.analyticsLabel}>Stop Time</Text>
                 <Text style={styles.analyticsValue}>
                   {tripAnalytics.totalStopTime.toFixed(1)} min
-                </Text>
-              </View>
+                  </Text>
+                </View>
               <View style={styles.analyticsItem}>
                 <Text style={styles.analyticsLabel}>Efficiency</Text>
                 <Text style={styles.analyticsValue}>
                   {tripAnalytics.routeEfficiency.toFixed(1)}%
-                </Text>
-              </View>
-            </View>
+                        </Text>
+                      </View>
+                    </View>
 
-            {/* Alerts */}
+                    {/* Alerts */}
             {tripAnalytics.alerts.length > 0 && (
-              <View style={styles.alertsContainer}>
-                <Text style={styles.alertsTitle}>⚠️ Trip Alerts</Text>
+                      <View style={styles.alertsContainer}>
+                        <Text style={styles.alertsTitle}>⚠️ Trip Alerts</Text>
                 {tripAnalytics.alerts.map((alert, index) => (
-                  <Text key={index} style={styles.alertText}>
-                    • {alert}
-                  </Text>
-                ))}
-              </View>
-            )}
+                          <Text key={index} style={styles.alertText}>
+                            • {alert}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
 
-            {/* Recommendations */}
+                    {/* Recommendations */}
             {tripAnalytics.recommendations.length > 0 && (
-              <View style={styles.recommendationsContainer}>
-                <Text style={styles.recommendationsTitle}>
-                  💡 Recommendations
-                </Text>
+                      <View style={styles.recommendationsContainer}>
+                        <Text style={styles.recommendationsTitle}>
+                          💡 Recommendations
+                        </Text>
                 {tripAnalytics.recommendations.map((rec, index) => (
-                  <Text key={index} style={styles.recommendationText}>
-                    • {rec}
-                  </Text>
-                ))}
+                          <Text key={index} style={styles.recommendationText}>
+                            • {rec}
+                          </Text>
+                        ))}
+                  </View>
+                )}
               </View>
             )}
-          </View>
-        )}
 
         {/* Detected Stops */}
         {detectedStops.length > 0 && (
@@ -840,55 +1323,53 @@ export default function ConductorTrackingScreen() {
             <Text style={styles.sectionTitle}>Detected Stops ({'>'}5 min)</Text>
             {detectedStops.map((stop, index) => (
               <View key={stop.id} style={styles.stopItem}>
-                <View style={styles.stopInfo}>
-                  <Text style={styles.stopNumber}>{index + 1}</Text>
-                  <View style={styles.stopDetails}>
-                    <Text style={styles.stopName}>{stop.placeName}</Text>
-                    <Text style={styles.stopCoords}>
+                      <View style={styles.stopInfo}>
+                        <Text style={styles.stopNumber}>{index + 1}</Text>
+                        <View style={styles.stopDetails}>
+                          <Text style={styles.stopName}>{stop.placeName}</Text>
+                          <Text style={styles.stopCoords}>
                       {stop.latitude.toFixed(6)}, {stop.longitude.toFixed(6)}
                     </Text>
                     <Text style={styles.stopTime}>
                       {new Date(stop.startTime).toLocaleTimeString()} -{' '}
                       {new Date(stop.endTime).toLocaleTimeString()}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.stopDuration}>
-                  <Text style={styles.durationText}>
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.stopDuration}>
+                        <Text style={styles.durationText}>
                     {stop.duration.toFixed(1)} min
-                  </Text>
-                </View>
-              </View>
-            ))}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
           </View>
         )}
 
         {/* Manual Stops */}
-        <View style={styles.stopsManagementContainer}>
-          <Text style={styles.sectionTitle}>Trip Stops</Text>
-          {tripStops.length === 0 ? (
-            <View style={styles.noStopsContainer}>
-              <Text style={styles.noStopsText}>No stops added yet</Text>
-              <Text style={styles.noStopsSubtext}>
-                Add stops to begin your trip
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.stopsList}>
-              {tripStops.map((stop, index) => (
-                <View key={stop.id} style={styles.stopItem}>
-                  <View style={styles.stopInfo}>
-                    <Text style={styles.stopNumber}>{index + 1}</Text>
-                    <View style={styles.stopDetails}>
-                      <Text style={styles.stopName}>{stop.name}</Text>
-                      <Text style={styles.stopCoords}>
+          <View style={styles.stopsManagementContainer}>
+            <Text style={styles.sectionTitle}>Trip Stops</Text>
+            {tripStops.length === 0 ? (
+              <View style={styles.noStopsContainer}>
+                <Text style={styles.noStopsText}>{t('no_stops_added')}</Text>
+                <Text style={styles.noStopsSubtext}>{t('add_stops_to_begin_trip')}</Text>
+              </View>
+            ) : (
+              <View style={styles.stopsList}>
+                {tripStops.map((stop, index) => (
+                  <View key={stop.id} style={styles.stopItem}>
+                    <View style={styles.stopInfo}>
+                      <Text style={styles.stopNumber}>{index + 1}</Text>
+                      <View style={styles.stopDetails}>
+                        <Text style={styles.stopName}>{stop.name}</Text>
+                        <Text style={styles.stopCoords}>
                         {stop.latitude.toFixed(6)}, {stop.longitude.toFixed(6)}
-                      </Text>
+                        </Text>
                     </View>
                   </View>
                   <View style={styles.stopActions}>
                     <View style={styles.stopStatus}>
-                      <View
+                        <View
                         style={[
                           styles.statusIndicator,
                           { backgroundColor: getStatusColor(stop.status) },
@@ -897,33 +1378,33 @@ export default function ConductorTrackingScreen() {
                       <Text style={styles.statusText}>{stop.status}</Text>
                     </View>
                     <View style={styles.actionButtons}>
-                      <TouchableOpacity
+                          <TouchableOpacity
                         style={styles.editButton}
                         onPress={() => {
-                          setEditingStop({
-                            id: stop.id,
-                            name: stop.name,
-                            latitude: stop.latitude.toString(),
-                            longitude: stop.longitude.toString(),
+                              setEditingStop({
+                                id: stop.id,
+                                name: stop.name,
+                                latitude: stop.latitude.toString(),
+                                longitude: stop.longitude.toString(),
                           });
                         }}
                       >
-                        <Text style={styles.editButtonText}>edit</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
+                        <Text style={styles.editButtonText}>{t('edit')}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
                         style={styles.deleteButton}
                         onPress={() => {
                           Alert.alert(
                             'Delete Stop',
                             `Are you sure you want to delete "${stop.name}"?`,
                             [
-                              { text: 'Cancel', style: 'cancel' },
+                              { text: t('cancel'), style: 'cancel' },
                               {
-                                text: 'Delete',
+                                text: t('delete'),
                                 style: 'destructive',
                                 onPress: () => {
-                                  setTripStops((prev) =>
-                                    prev.filter((s) => s.id !== stop.id)
+                              setTripStops((prev) =>
+                                prev.filter((s) => s.id !== stop.id)
                                   );
                                 },
                               },
@@ -931,41 +1412,277 @@ export default function ConductorTrackingScreen() {
                           );
                         }}
                       >
-                        <Text style={styles.deleteButtonText}>delete</Text>
-                      </TouchableOpacity>
+                        <Text style={styles.deleteButtonText}>{t('delete')}</Text>
+                          </TouchableOpacity>
+                        </View>
                     </View>
                   </View>
-                </View>
-              ))}
-            </View>
-          )}
+                ))}
+              </View>
+            )}
 
-          <TouchableOpacity
+              <TouchableOpacity
             style={styles.addStopButton}
-            onPress={() => setShowAddStopModal(true)}
-          >
-            <Text style={styles.addStopButtonText}>+ Add Stop</Text>
-          </TouchableOpacity>
+                onPress={() => setShowAddStopModal(true)}
+              >
+                <Text style={styles.addStopButtonText}>{t('add_stop')}</Text>
+              </TouchableOpacity>
         </View>
 
         {/* Trip Controls */}
         <View style={styles.controlsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              tripStarted ? styles.stopButton : styles.startButton,
-            ]}
-            onPress={tripStarted ? endTrip : startTrip}
-          >
-            <Text style={styles.buttonText}>
-              {tripStarted ? 'End Trip' : 'Start Trip'}
-            </Text>
-          </TouchableOpacity>
+          {/* Debug Info */}
+          {selectedTrip && (
+            <View style={styles.debugInfo}>
+              <Text style={styles.debugText}>
+                {t('debug_trip_status').replace('{status}', selectedTrip.trip_status).replace('{started}', tripStarted.toString())}
+              </Text>
+            </View>
+          )}
+
+          {selectedTrip &&
+            selectedTrip.trip_status === 'in_progress' &&
+            !tripStarted && (
+              <TouchableOpacity
+                style={[styles.button, styles.startButton]}
+                onPress={() => handleStartGPSTracking(selectedTrip)}
+              >
+                <Text style={styles.buttonText}>🚀 {t('start_gps_tracking')}</Text>
+              </TouchableOpacity>
+            )}
+
+          {selectedTrip && tripStarted && (
+            <TouchableOpacity
+              style={[styles.button, styles.stopButton]}
+              onPress={endTrip}
+            >
+              <Text style={styles.buttonText}>🛑 {t('end_trip')}</Text>
+            </TouchableOpacity>
+          )}
+
           <Text style={styles.trackingInfo}>
             {tripStarted
-              ? 'GPS tracking active - collecting data every 10 seconds'
-              : 'Click start to begin GPS tracking and stop detection'}
+              ? t('gps_tracking_active_info')
+              : selectedTrip && selectedTrip.trip_status === 'in_progress'
+              ? t('start_gps_tracking_prompt')
+              : t('no_in_progress_trip_selected')}
           </Text>
+
+          {/* Debug Button */}
+              <TouchableOpacity
+                style={[
+              styles.button,
+              { backgroundColor: '#6B7280', marginTop: 8 },
+            ]}
+            onPress={() => {
+              console.log('🔍 Debug Info:');
+              console.log('   Selected Trip:', selectedTrip);
+              console.log('   Trip Started:', tripStarted);
+              console.log('   Tracking:', tracking);
+              console.log('   GPS Points Count:', gpsPoints.length);
+              console.log('   All Trips Count:', allConductorTrips.length);
+              console.log('   User:', user?.username);
+              console.log(
+                '   All Trips Statuses:',
+                allConductorTrips.map((t) => ({
+                  id: t.trip_id,
+                  status: t.trip_status,
+                }))
+              );
+              Alert.alert(
+                'Debug Info',
+                `Selected Trip: ${
+                  selectedTrip?.trip_id || 'None'
+                }\nTrip Started: ${tripStarted}\nTracking: ${tracking}\nGPS Points: ${
+                  gpsPoints.length
+                }\nAll Trips: ${allConductorTrips.length}`
+              );
+            }}
+          >
+            <Text style={styles.buttonText}>🔍 {t('debug_info')}</Text>
+              </TouchableOpacity>
+
+          {/* Manual GPS Test Button */}
+          {selectedTrip && (
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                { backgroundColor: '#059669', marginTop: 8 },
+              ]}
+              onPress={async () => {
+                try {
+                  console.log('�� Testing manual GPS data storage...');
+                  const loc = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.High,
+                  });
+
+                  const testPoint: GPSPoint = {
+                    latitude: loc.coords.latitude,
+                    longitude: loc.coords.longitude,
+                    timestamp: loc.timestamp,
+                    accuracy: loc.coords.accuracy || 0,
+                  };
+
+                  console.log('🧪 Test GPS Point:', testPoint);
+                  console.log('🧪 Selected Trip:', selectedTrip);
+
+                  await storeGPSData(testPoint);
+                  Alert.alert(
+                    'GPS Test',
+                    'Manual GPS data storage test completed! Check console for details.'
+                  );
+                } catch (error: any) {
+                  console.error('❌ Manual GPS test failed:', error);
+                  Alert.alert(
+                    'GPS Test Error',
+                    `Failed to test GPS data storage: ${
+                      error?.message || 'Unknown error'
+                    }`
+                  );
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>🧪 {t('test_gps_storage')}</Text>
+              </TouchableOpacity>
+          )}
+
+          {/* Reset Trip State Button */}
+              <TouchableOpacity
+                style={[
+                  styles.button,
+              { backgroundColor: '#DC2626', marginTop: 8 },
+            ]}
+            onPress={() => {
+              setTripStarted(false);
+              setTracking(false);
+              setGpsPoints([]);
+              setDetectedStops([]);
+              setTripAnalytics(null);
+              setShowAnalytics(false);
+              if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+              }
+              Alert.alert(
+                'Reset Complete',
+                'Trip state has been reset. You can now start fresh.'
+              );
+            }}
+          >
+            <Text style={styles.buttonText}>🔄 {t('reset_trip_state')}</Text>
+              </TouchableOpacity>
+
+          {/* Test Trip Creation Button */}
+              <TouchableOpacity
+                style={[
+                  styles.button,
+              { backgroundColor: '#8B5CF6', marginTop: 8 },
+            ]}
+            onPress={async () => {
+              try {
+                console.log('🧪 Creating test trip...');
+                // This would need to be implemented in your backend
+                // For now, just show what we need
+                Alert.alert(
+                  'Test Trip Info',
+                  'To test the system, you need a trip with status "in_progress" assigned to your conductor username. Check the debug info to see your current trips and their statuses.'
+                );
+              } catch (error) {
+                console.error('❌ Test trip creation failed:', error);
+                Alert.alert(
+                  'Error',
+                  'Failed to create test trip. Check console for details.'
+                );
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>🧪 {t('test_trip_info')}</Text>
+              </TouchableOpacity>
+
+          {/* Test Backend GPS Storage Button */}
+              <TouchableOpacity
+                style={[
+                  styles.button,
+              { backgroundColor: '#F59E0B', marginTop: 8 },
+            ]}
+            onPress={async () => {
+              try {
+                console.log('🧪 Testing backend GPS data storage directly...');
+
+                const response = await fetch(
+                  'http://192.168.1.100:3000/api/trips/testGPSData',
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                  }
+                );
+
+                const result = await response.json();
+                console.log('🧪 Backend test result:', result);
+
+                if (result.success) {
+                  Alert.alert(
+                    'Backend Test Success',
+                    'GPS data storage test completed successfully! Check console for details.'
+                  );
+                } else {
+                  Alert.alert(
+                    'Backend Test Failed',
+                    `Test failed: ${result.error}`
+                  );
+                }
+              } catch (error: any) {
+                console.error('❌ Backend GPS test failed:', error);
+                Alert.alert(
+                  'Backend Test Error',
+                  `Failed to test backend: ${error?.message || 'Unknown error'}`
+                );
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>🧪 {t('test_backend_gps')}</Text>
+              </TouchableOpacity>
+
+          {/* Test Trip Status Update Button */}
+          {selectedTrip && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                { backgroundColor: '#8B5CF6', marginTop: 8 },
+              ]}
+              onPress={async () => {
+                try {
+                  console.log('🧪 Testing trip status update...');
+                  console.log('   Trip ID:', selectedTrip.trip_id);
+                  console.log('   Current Status:', selectedTrip.trip_status);
+
+                  const result = await conductorAPI.updateTripStatus(
+                    selectedTrip.trip_id,
+                    'completed'
+                  );
+                  console.log('🧪 Trip status update result:', result);
+
+                  Alert.alert(
+                    'Trip Status Test',
+                    'Trip status update test completed! Check console for details.'
+                  );
+                } catch (error: any) {
+                  console.error('❌ Trip status update test failed:', error);
+                  Alert.alert(
+                    'Trip Status Test Error',
+                    `Failed to update trip status: ${
+                      error?.message || 'Unknown error'
+                    }`
+                  );
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>🧪 {t('test_trip_status_update')}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -978,11 +1695,11 @@ export default function ConductorTrackingScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Stop</Text>
+            <Text style={styles.modalTitle}>{t('add_new_stop')}</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="Stop Name (e.g., Central Station)"
+              placeholder={t('stop_name_placeholder')}
               value={newStop.name}
               onChangeText={(text) =>
                 setNewStop((prev) => ({ ...prev, name: text }))
@@ -991,7 +1708,7 @@ export default function ConductorTrackingScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Latitude (e.g., 12.9716)"
+              placeholder={t('latitude_placeholder')}
               value={newStop.latitude}
               onChangeText={(text) =>
                 setNewStop((prev) => ({ ...prev, latitude: text }))
@@ -1001,7 +1718,7 @@ export default function ConductorTrackingScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Longitude (e.g., 77.5946)"
+              placeholder={t('longitude_placeholder')}
               value={newStop.longitude}
               onChangeText={(text) =>
                 setNewStop((prev) => ({ ...prev, longitude: text }))
@@ -1014,7 +1731,7 @@ export default function ConductorTrackingScreen() {
               onPress={getCurrentLocation}
             >
               <Text style={styles.currentLocationButtonText}>
-                Use Current Location
+                {t('use_current_location')}
               </Text>
             </TouchableOpacity>
 
@@ -1026,14 +1743,14 @@ export default function ConductorTrackingScreen() {
                   setNewStop({ name: '', latitude: '', longitude: '' });
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalButton, styles.addButton]}
                 onPress={addStop}
               >
-                <Text style={styles.addButtonText}>Add Stop</Text>
+                <Text style={styles.addButtonText}>{t('add_stop')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1049,11 +1766,11 @@ export default function ConductorTrackingScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Stop</Text>
+            <Text style={styles.modalTitle}>{t('edit_stop')}</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="Stop Name"
+              placeholder={t('stop_name_placeholder')}
               value={editingStop?.name || ''}
               onChangeText={(text) =>
                 setEditingStop((prev) =>
@@ -1064,7 +1781,7 @@ export default function ConductorTrackingScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Latitude"
+              placeholder={t('latitude_placeholder')}
               value={editingStop?.latitude || ''}
               onChangeText={(text) =>
                 setEditingStop((prev) =>
@@ -1076,7 +1793,7 @@ export default function ConductorTrackingScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Longitude"
+              placeholder={t('longitude_placeholder')}
               value={editingStop?.longitude || ''}
               onChangeText={(text) =>
                 setEditingStop((prev) =>
@@ -1091,7 +1808,7 @@ export default function ConductorTrackingScreen() {
               onPress={getCurrentLocation}
             >
               <Text style={styles.currentLocationButtonText}>
-                Use Current Location
+                {t('use_current_location')}
               </Text>
             </TouchableOpacity>
 
@@ -1100,7 +1817,7 @@ export default function ConductorTrackingScreen() {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setEditingStop(null)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1131,7 +1848,7 @@ export default function ConductorTrackingScreen() {
                   setEditingStop(null);
                 }}
               >
-                <Text style={styles.addButtonText}>Save Changes</Text>
+                <Text style={styles.addButtonText}>{t('save_changes')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1146,6 +1863,203 @@ const styles = StyleSheet.create({
   header: {
     padding: 30,
     paddingTop: 60,
+  },
+  tripDetailsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    margin: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  tripInfo: {
+    gap: 12,
+  },
+  tripRoute: {
+    marginBottom: 8,
+  },
+  tripRouteLabel: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  tripRouteValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    lineHeight: 24,
+  },
+  tripDetailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  tripDetailItem: {
+    flex: 1,
+    minWidth: '48%',
+  },
+  tripDetailLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  tripDetailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  noTripContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 24,
+    margin: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  noTripTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  noTripSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  refreshTripButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  refreshTripButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  tripsListContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    margin: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  noTripsContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  noTripsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  noTripsSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  tripCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  activeTripCard: {
+    backgroundColor: '#DBEAFE',
+    borderColor: '#3B82F6',
+    borderWidth: 2,
+  },
+  tripCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  tripCardInfo: {
+    flex: 1,
+  },
+  tripCardRoute: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  tripCardVehicle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  tripCardTime: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  tripStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  tripStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  startTripButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  startTripButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  activeTripIndicator: {
+    backgroundColor: '#10B981',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  activeTripText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  startGPSTrackingButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  startGPSTrackingButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   headerTitle: {
     fontSize: 22,
@@ -1606,5 +2520,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#64748B',
+    fontSize: 16,
+  },
+  debugInfo: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#92400E',
+    textAlign: 'center',
   },
 });

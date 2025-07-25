@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { router } from 'expo-router';
 import Navbar from '@/components/Navbar';
 import { mockNotifications } from '@/data/mockData';
@@ -23,40 +24,61 @@ import {
 
 export default function StaffDashboardScreen() {
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   const unreadNotifications = mockNotifications.filter(
-    (n) => !n.read && n.userId === user?.user_id
+    (n) => !n.read && n.userId === String(user?.user_id || '')
   ).length;
 
   const stats = [
-    { icon: Bus, label: 'Active Buses', value: '45', color: '#DC2626' },
-    { icon: Users, label: 'Waiting List', value: '23', color: '#F59E0B' },
-    { icon: Ticket, label: "Today's Bookings", value: '287', color: '#10B981' },
-    { icon: TrendingUp, label: 'Revenue', value: '₹1.2L', color: '#3B82F6' },
+    {
+      icon: Bus,
+      label: t('active_buses'),
+      value: '45',
+      color: '#DC2626',
+    },
+    {
+      icon: Users,
+      label: t('waiting_list'),
+      value: '23',
+      color: '#F59E0B',
+    },
+    {
+      icon: Ticket,
+      label: t('todays_bookings'),
+      value: '287',
+      color: '#10B981',
+    },
+    {
+      icon: TrendingUp,
+      label: t('revenue'),
+      value: '₹1.2L',
+      color: '#3B82F6',
+    },
   ];
 
   const quickActions = [
     {
       icon: Bus,
-      title: 'Add New Bus',
-      subtitle: 'Schedule new route',
+      title: t('add_new_bus'),
+      subtitle: t('schedule_new_route'),
       route: '/staff/buses',
     },
     {
       icon: Ticket,
-      title: 'Offline Booking',
-      subtitle: 'Manual ticket booking',
+      title: t('offline_booking'),
+      subtitle: t('manual_ticket_booking'),
       route: '/staff/booking',
     },
     {
       icon: Users,
-      title: 'Manage Waitlist',
-      subtitle: 'Process waiting passengers',
+      title: t('manage_waitlist'),
+      subtitle: t('process_waiting_passengers'),
       route: '/staff/waitlist',
     },
     {
       icon: MapPin,
-      title: 'Track Buses',
-      subtitle: 'Monitor live locations',
+      title: t('track_buses'),
+      subtitle: t('monitor_live_locations'),
       route: '/staff/tracking',
     },
   ];
@@ -64,31 +86,35 @@ export default function StaffDashboardScreen() {
   const recentActivities = [
     {
       time: '10:30 AM',
-      activity: 'New bus TN 09 Z 5678 added to Chennai-Salem route',
+      activity: t('recent_activity_1'),
     },
     {
       time: '10:15 AM',
-      activity: '15 passengers moved from waitlist to confirmed',
+      activity: t('recent_activity_2'),
     },
     {
       time: '09:45 AM',
-      activity: 'Bus TN 11 X 1234 reported 30 minutes delay',
+      activity: t('recent_activity_3'),
     },
     {
       time: '09:30 AM',
-      activity: 'Offline booking completed for 5 passengers',
+      activity: t('recent_activity_4'),
     },
   ];
 
   return (
     <View style={styles.container}>
-      <Navbar title="Staff Dashboard" notificationCount={unreadNotifications} />
-
+      <Navbar
+        title={t('staff_dashboard')}
+        notificationCount={unreadNotifications}
+      />
       <ScrollView style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.greeting}>Welcome back,</Text>
+          <Text style={styles.greeting}>{t('welcome_back')}</Text>
           <Text style={styles.staffName}>{user?.username}</Text>
-          <Text style={styles.employeeId}>Employee ID: {user?.user_id}</Text>
+          <Text style={styles.employeeId}>
+            {t('employee_id', { id: user?.user_id })}
+          </Text>
         </View>
 
         {/* Statistics */}
@@ -96,9 +122,7 @@ export default function StaffDashboardScreen() {
           {stats.map((stat, index) => (
             <View key={index} style={styles.statCard}>
               <stat.icon size={24} color={stat.color} />
-              <Text style={[styles.statValue, { color: stat.color }]}>
-                {stat.value}
-              </Text>
+              <Text style={[styles.statValue, { color: stat.color }]}> {stat.value} </Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
           ))}
@@ -106,7 +130,7 @@ export default function StaffDashboardScreen() {
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={styles.sectionTitle}>{t('quick_actions')}</Text>
           <View style={styles.actionGrid}>
             {quickActions.map((action, index) => (
               <TouchableOpacity
@@ -124,22 +148,22 @@ export default function StaffDashboardScreen() {
 
         {/* Today's Overview */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Overview</Text>
+          <Text style={styles.sectionTitle}>{t('todays_overview')}</Text>
           <View style={styles.overviewCard}>
             <View style={styles.overviewRow}>
               <View style={styles.overviewItem}>
                 <Clock size={20} color="#6B7280" />
-                <Text style={styles.overviewLabel}>On Time</Text>
+                <Text style={styles.overviewLabel}>{t('on_time')}</Text>
                 <Text style={styles.overviewValue}>85%</Text>
               </View>
               <View style={styles.overviewItem}>
                 <AlertCircle size={20} color="#6B7280" />
-                <Text style={styles.overviewLabel}>Delayed</Text>
+                <Text style={styles.overviewLabel}>{t('delayed')}</Text>
                 <Text style={styles.overviewValue}>7</Text>
               </View>
               <View style={styles.overviewItem}>
                 <Users size={20} color="#6B7280" />
-                <Text style={styles.overviewLabel}>Occupancy</Text>
+                <Text style={styles.overviewLabel}>{t('occupancy')}</Text>
                 <Text style={styles.overviewValue}>78%</Text>
               </View>
             </View>
@@ -148,7 +172,7 @@ export default function StaffDashboardScreen() {
 
         {/* Recent Activities */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activities</Text>
+          <Text style={styles.sectionTitle}>{t('recent_activities')}</Text>
           <View style={styles.activitiesContainer}>
             {recentActivities.map((activity, index) => (
               <View key={index} style={styles.activityItem}>
@@ -165,22 +189,22 @@ export default function StaffDashboardScreen() {
 
         {/* Performance Metrics */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Performance Metrics</Text>
+          <Text style={styles.sectionTitle}>{t('performance_metrics')}</Text>
           <View style={styles.metricsCard}>
             <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Average Rating</Text>
+              <Text style={styles.metricLabel}>{t('average_rating')}</Text>
               <Text style={styles.metricValue}>4.2/5.0</Text>
             </View>
             <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Customer Satisfaction</Text>
+              <Text style={styles.metricLabel}>{t('customer_satisfaction')}</Text>
               <Text style={styles.metricValue}>87%</Text>
             </View>
             <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Fleet Utilization</Text>
+              <Text style={styles.metricLabel}>{t('fleet_utilization')}</Text>
               <Text style={styles.metricValue}>92%</Text>
             </View>
             <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Revenue Growth</Text>
+              <Text style={styles.metricLabel}>{t('revenue_growth')}</Text>
               <Text style={styles.metricValue}>+12%</Text>
             </View>
           </View>

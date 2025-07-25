@@ -21,6 +21,8 @@ export default function RaiseTicketScreen() {
     'Not Stopping',
     'Skipping Signals',
     'High Speed',
+    'cleaniness',
+    'driver behaviour',
     'Others'
   ];
   const [dropdownOpen, setDropdownOpen] = useState(false);

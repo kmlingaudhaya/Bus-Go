@@ -1,9 +1,30 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  ScrollView,
+} from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { router } from 'expo-router';
-import { Menu, Bell, X, Bus, User, Ticket, MapPin, Settings, ChartBar as BarChart3, QrCode, Users, LogOut } from 'lucide-react-native';
+import {
+  Menu,
+  Bell,
+  X,
+  Bus,
+  User,
+  Ticket,
+  MapPin,
+  Settings,
+  ChartBar as BarChart3,
+  QrCode,
+  Users,
+  LogOut,
+} from 'lucide-react-native';
 import RaiseTicketScreen from '@/app/raise-ticket';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface NavbarProps {
   title: string;
@@ -12,6 +33,7 @@ interface NavbarProps {
 
 export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const [showMenu, setShowMenu] = useState(false);
   const [showRaiseTicket, setShowRaiseTicket] = useState(false);
 
@@ -23,16 +45,24 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
 
   const getMenuItems = () => {
     const commonItems = [
-      { icon: User, label: 'Profile', route: '/profile' },
-      { icon: Bell, label: 'Notifications', route: '/notifications' },
-      { icon: Settings, label: 'Settings', route: '/settings' },
+      { icon: User, label: t('profile') || 'Profile', route: '/profile' },
+      {
+        icon: Bell,
+        label: t('notifications') || 'Notifications',
+        route: '/notifications',
+      },
+      {
+        icon: Settings,
+        label: t('settings') || 'Settings',
+        route: '/settings',
+      },
     ];
 
     let raiseTicketItem = null;
     if (user?.role === 'passenger' || user?.role === 'conductor') {
       raiseTicketItem = {
         icon: Ticket,
-        label: 'Raise Ticket',
+        label: t('complaint'),
         action: () => {
           setShowMenu(false);
           setShowRaiseTicket(true);
@@ -43,28 +73,76 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
     switch (user?.role) {
       case 'passenger':
         return [
-          { icon: Bus, label: 'Search Buses', route: '/(tabs)' },
-          { icon: Ticket, label: 'My Tickets', route: '/(tabs)/tickets' },
-          { icon: MapPin, label: 'Track Trip', route: '/(tabs)/tracking' },
+          {
+            icon: Bus,
+            label: t('search_buses') ,
+            route: '/(tabs)',
+          },
+          {
+            icon: Ticket,
+            label: t('my_tickets'),
+            route: '/(tabs)/tickets',
+          },
+          {
+            icon: MapPin,
+            label: t('track_trip'),
+            route: '/(tabs)/tracking',
+          },
           ...(raiseTicketItem ? [raiseTicketItem] : []),
           ...commonItems,
         ];
       case 'conductor':
         return [
-          { icon: Bus, label: 'My Trips', route: '/conductor/trips' },
-          { icon: QrCode, label: 'QR Scanner', route: '/conductor/scanner' },
-          { icon: MapPin, label: 'Trip Tracking', route: '/conductor/tracking' },
-          { icon: Ticket, label: 'Manual Booking', route: '/conductor/booking' },
+          {
+            icon: Bus,
+            label: t('my_trips') || 'My Trips',
+            route: '/conductor/trips',
+          },
+          {
+            icon: QrCode,
+            label: t('qr_scanner') || 'QR Scanner',
+            route: '/conductor/scanner',
+          },
+          {
+            icon: MapPin,
+            label: t('trip_tracking') || 'Trip Tracking',
+            route: '/conductor/tracking',
+          },
+          {
+            icon: Ticket,
+            label: t('manual_booking') || 'Manual Booking',
+            route: '/conductor/booking',
+          },
           ...(raiseTicketItem ? [raiseTicketItem] : []),
           ...commonItems,
         ];
       case 'staff':
         return [
-          { icon: BarChart3, label: 'Dashboard', route: '/staff/dashboard' },
-          { icon: Bus, label: 'Manage Buses', route: '/staff/buses' },
-          { icon: Users, label: 'Waiting List', route: '/staff/waitlist' },
-          { icon: MapPin, label: 'Trip Tracking', route: '/staff/tracking' },
-          { icon: Ticket, label: 'Offline Booking', route: '/staff/booking' },
+          {
+            icon: BarChart3,
+            label: t('dashboard') || 'Dashboard',
+            route: '/staff/dashboard',
+          },
+          {
+            icon: Bus,
+            label: t('manage_buses') || 'Manage Buses',
+            route: '/staff/buses',
+          },
+          {
+            icon: Users,
+            label: t('waiting_list') || 'Waiting List',
+            route: '/staff/waitlist',
+          },
+          {
+            icon: MapPin,
+            label: t('trip_tracking') || 'Trip Tracking',
+            route: '/staff/tracking',
+          },
+          {
+            icon: Ticket,
+            label: t('offline_booking') || 'Offline Booking',
+            route: '/staff/booking',
+          },
           ...commonItems,
         ];
       default:
@@ -119,11 +197,19 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
                 <View>
                   <Text style={styles.userName}>{user?.username}</Text>
                   <Text style={styles.userRole}>
-                    {user?.role === 'passenger' ? 'Passenger' : 
-                     user?.role === 'conductor' ? 'Conductor' : 'Staff Member'}
+                    {user?.role === 'passenger'
+                      ? t('passenger') || 'Passenger'
+                      : user?.role === 'conductor'
+                      ? t('conductor') || 'Conductor'
+                      : t('staff_member') || 'Staff Member'}
                   </Text>
                   {user?.user_id && (
-                    <Text style={styles.employeeId}>ID: {user.user_id}</Text>
+                    <Text style={styles.employeeId}>
+                      {(t('id_colon') || 'ID: {id}').replace(
+                        '{id}',
+                        String(user.user_id)
+                      )}
+                    </Text>
                   )}
                 </View>
               </View>
@@ -158,13 +244,20 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
                 onPress={handleLogout}
               >
                 <LogOut size={20} color="#DC2626" />
-                <Text style={styles.menuItemText}>Logout</Text>
+                <Text style={styles.menuItemText}>
+                  {t('logout') || 'Logout'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
 
             <View style={styles.menuFooter}>
-              <Text style={styles.footerText}>Tamil Nadu State Transport</Text>
-              <Text style={styles.footerSubtext}>Government of Tamil Nadu</Text>
+              <Text style={styles.footerText}>
+                {t('tamil_nadu_state_transport') ||
+                  'Tamil Nadu State Transport'}
+              </Text>
+              <Text style={styles.footerSubtext}>
+                {t('government_of_tamil_nadu') || 'Government of Tamil Nadu'}
+              </Text>
             </View>
           </View>
         </View>
@@ -182,6 +275,11 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
             onPress={() => setShowRaiseTicket(false)}
           >
             <X size={28} color="#DC2626" />
+            <Text
+              style={{ color: '#DC2626', fontWeight: '600', marginLeft: 8 }}
+            >
+              {t('close') || 'Close'}
+            </Text>
           </TouchableOpacity>
           <RaiseTicketScreen />
         </View>

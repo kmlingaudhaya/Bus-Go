@@ -12,6 +12,7 @@ import {
 import { router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { Bus, Mail, Lock, User } from 'lucide-react-native';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -25,11 +26,12 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
 
   const { login, register } = useAuth();
+  const { t, language } = useLanguage();
 
   const handleAuth = async () => {
     if (isLogin) {
       if (!(email || username) || !password) {
-        Alert.alert('Error', 'Please enter your email/username and password');
+        Alert.alert(t('error'), t('auth_enter_credentials'));
         return;
       }
       setLoading(true);
@@ -37,13 +39,13 @@ export default function AuthScreen() {
         await login(email || username, password);
         router.replace('/');
       } catch (error: any) {
-        Alert.alert('Error', error?.message || 'Invalid credentials');
+        Alert.alert(t('error'), error?.message || t('invalid_credentials'));
       } finally {
         setLoading(false);
       }
     } else {
       if (!username || !email || !password || !role) {
-        Alert.alert('Error', 'Please fill all required fields');
+        Alert.alert(t('error'), t('fill_required_fields'));
         return;
       }
       setLoading(true);
@@ -57,10 +59,10 @@ export default function AuthScreen() {
           lastname,
           dof,
         });
-        Alert.alert('Success', 'Registration successful! Please log in.');
+        Alert.alert(t('success') || 'Success', t('registration_success') || 'Registration successful! Please log in.');
         setIsLogin(true);
       } catch (error: any) {
-        Alert.alert('Error', error.message || 'Registration failed');
+        Alert.alert(t('error'), error.message || t('registration_failed') || 'Registration failed');
       } finally {
         setLoading(false);
       }
@@ -81,32 +83,32 @@ export default function AuthScreen() {
         />
         <View style={styles.headerOverlay}>
           <Bus size={48} color="#FFFFFF" />
-          <Text style={styles.title}>Tamil Nadu State Transport</Text>
-          <Text style={styles.subtitle}>Government of Tamil Nadu</Text>
-          <Text style={styles.tagline}>Safe • Reliable • Affordable</Text>
+          <Text style={styles.title}>{t('tnstc_hero_title') || 'Tamil Nadu State Transport'}</Text>
+          <Text style={styles.subtitle}>{t('tnstc_hero_subtitle') || 'Government of Tamil Nadu'}</Text>
+          <Text style={styles.tagline}>{t('tnstc_hero_tagline') || 'Safe • Reliable • Affordable'}</Text>
         </View>
       </View>
 
       <View style={styles.formContainer}>
         <View style={styles.form}>
           <Text style={styles.formTitle}>
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            {isLogin ? t('welcome_back') || 'Welcome Back' : t('create_account') || 'Create Account'}
           </Text>
           <Text style={styles.formSubtitle}>
             {isLogin
-              ? 'Sign in to your account'
-              : 'Register for TNSTC services'}
+              ? t('sign_in_subtitle') || 'Sign in to your account'
+              : t('create_account_subtitle') || 'Register for TNSTC services'}
           </Text>
 
           {!isLogin && (
             <>
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Username *</Text>
+                <Text style={styles.inputLabel}>{t('username_label') || 'Username'} *</Text>
                 <View style={styles.inputWrapper}>
                   <User size={20} color="#6B7280" />
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter your username"
+                    placeholder={t('username_placeholder') || 'Enter your username'}
                     value={username}
                     onChangeText={setUsername}
                     autoCapitalize="none"
@@ -114,47 +116,47 @@ export default function AuthScreen() {
                 </View>
               </View>
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>First Name</Text>
+                <Text style={styles.inputLabel}>{t('firstname_label') || 'First Name'}</Text>
                 <View style={styles.inputWrapper}>
                   <User size={20} color="#6B7280" />
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter your first name"
+                    placeholder={t('firstname_placeholder') || 'Enter your first name'}
                     value={firstname}
                     onChangeText={setFirstname}
                   />
                 </View>
               </View>
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Last Name</Text>
+                <Text style={styles.inputLabel}>{t('lastname_label') || 'Last Name'}</Text>
                 <View style={styles.inputWrapper}>
                   <User size={20} color="#6B7280" />
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter your last name"
+                    placeholder={t('lastname_placeholder') || 'Enter your last name'}
                     value={lastname}
                     onChangeText={setLastname}
                   />
                 </View>
               </View>
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Date of Birth</Text>
+                <Text style={styles.inputLabel}>{t('dob_label') || 'Date of Birth'}</Text>
                 <View style={styles.inputWrapper}>
                   <User size={20} color="#6B7280" />
                   <TextInput
                     style={styles.input}
-                    placeholder="YYYY-MM-DD"
+                    placeholder={t('dob_placeholder') || 'YYYY-MM-DD'}
                     value={dof}
                     onChangeText={setDof}
                   />
                 </View>
               </View>
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Role *</Text>
+                <Text style={styles.inputLabel}>{t('role_label') || 'Role'} *</Text>
                 <View style={styles.inputWrapper}>
                   <TextInput
                     style={styles.input}
-                    placeholder="passenger, conductor, staff"
+                    placeholder={t('role_placeholder') || 'passenger, conductor, staff'}
                     value={role}
                     onChangeText={setRole}
                     autoCapitalize="none"
@@ -166,15 +168,13 @@ export default function AuthScreen() {
 
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>
-              {isLogin ? 'Email or Username' : 'Email Address *'}
+              {isLogin ? t('email_label') || 'Email or Username' : t('email_label') || 'Email Address *'}
             </Text>
             <View style={styles.inputWrapper}>
               <Mail size={20} color="#6B7280" />
               <TextInput
                 style={styles.input}
-                placeholder={
-                  isLogin ? 'Enter your email or username' : 'Enter your email'
-                }
+                placeholder={isLogin ? t('email_username_placeholder') || 'Enter your email or username' : t('email_placeholder') || 'Enter your email'}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -184,12 +184,12 @@ export default function AuthScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Password *</Text>
+            <Text style={styles.inputLabel}>{t('password_label') || 'Password'} *</Text>
             <View style={styles.inputWrapper}>
               <Lock size={20} color="#6B7280" />
               <TextInput
                 style={styles.input}
-                placeholder="Enter your password"
+                placeholder={t('password_placeholder') || 'Enter your password'}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -203,7 +203,11 @@ export default function AuthScreen() {
             disabled={loading}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Sign Up'}
+              {loading
+                ? t('loading_text') || 'Please wait...'
+                : isLogin
+                ? t('sign_in_button') || 'Sign In'
+                : t('sign_up_button') || 'Sign Up'}
             </Text>
           </TouchableOpacity>
 
@@ -213,8 +217,8 @@ export default function AuthScreen() {
           >
             <Text style={styles.switchText}>
               {isLogin
-                ? "Don't have an account? Sign Up"
-                : 'Already have an account? Sign In'}
+                ? t('no_account') + (t('sign_up_link') || 'Sign Up')
+                : t('have_account') + (t('sign_in_link') || 'Sign In')}
             </Text>
           </TouchableOpacity>
         </View>

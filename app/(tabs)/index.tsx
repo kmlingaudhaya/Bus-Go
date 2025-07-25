@@ -1,30 +1,67 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  FlatList,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { router } from 'expo-router';
 import Navbar from '@/components/Navbar';
 import SearchBar from '@/components/SearchBar';
 import BusCard from '@/components/BusCard';
 import { mockBuses, mockNotifications } from '@/data/mockData';
-import { Bus as BusType } from '@/types';
-import { Calendar, Clock, MapPin, Users, Star, TrendingUp, Bus as BusIcon } from 'lucide-react-native';
+import { Bus as BusType, Notification } from '@/types';
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
+  Star,
+  TrendingUp,
+  Bus as BusIcon,
+} from 'lucide-react-native';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const [from, setFrom] = useState('Chennai');
-  const [to, setTo] = useState('Madurai');
+  const { t, language } = useLanguage();
+  // Use mockBuses and mockNotifications directly as arrays
+  const [from, setFrom] = useState('chennai');
+  const [to, setTo] = useState('madurai');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [filteredBuses, setFilteredBuses] = useState<BusType[]>([]);
 
-  const unreadNotifications = mockNotifications.filter(n => !n.read && n.userId === user?.id).length;
+  // Helper to safely get user id and name
+  const userId =
+    user && typeof user === 'object' && 'id' in user
+      ? (user as any).id
+      : undefined;
+  const userName =
+    user && typeof user === 'object' && 'name' in user
+      ? (user as any).name
+      : '';
+
+  const unreadNotifications =
+    Array.isArray(mockNotifications) && userId
+      ? (mockNotifications as Notification[]).filter(
+          (n) => !n.read && n.userId === userId
+        ).length
+      : 0;
 
   useEffect(() => {
-    // Filter buses based on search criteria
-    const filtered = mockBuses.filter(bus => 
-      bus.route.from === from && bus.route.to === to
+    if (!Array.isArray(mockBuses)) {
+      setFilteredBuses([]);
+      return;
+    }
+    const filtered = (mockBuses as BusType[]).filter(
+      (bus) => bus.route.from === from && bus.route.to === to
     );
     setFilteredBuses(filtered);
-  }, [from, to, user]);
+  }, [from, to, userId]);
 
   const handleSwapCities = () => {
     const temp = from;
@@ -33,34 +70,47 @@ export default function HomeScreen() {
   };
 
   const handleBusPress = (bus: BusType) => {
+    // TODO: Replace '/(tabs)' with the correct booking route if available in your router config
     router.push({
-      pathname: '/booking',
-      params: { busId: bus.id }
+      pathname: '/(tabs)',
+      params: { busId: bus.id },
     });
   };
 
   return (
     <View style={styles.container}>
-      <Navbar title="TNSTC Bus Booking" notificationCount={unreadNotifications} />
-      
+      <Navbar
+        title={t('app_name') || 'TNSTC Bus Booking'}
+        notificationCount={unreadNotifications}
+      />
       <ScrollView style={styles.content}>
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <Image
-            source={{ uri: 'https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg?auto=compress&cs=tinysrgb&w=800' }}
+            source={{
+              uri: 'https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg?auto=compress&cs=tinysrgb&w=800',
+            }}
             style={styles.heroImage}
           />
           <View style={styles.heroOverlay}>
-            <Text style={styles.heroTitle}>Tamil Nadu State Transport</Text>
-            <Text style={styles.heroSubtitle}>Safe, Reliable & Affordable Travel</Text>
+            <Text style={styles.heroTitle}>
+              {t('tnstc_hero_title') || 'Tamil Nadu State Transport'}
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              {t('tnstc_hero_subtitle') || 'Safe, Reliable & Affordable Travel'}
+            </Text>
           </View>
         </View>
 
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.userName}>{user?.name}</Text>
-          <Text style={styles.welcomeSubtext}>Book your journey across Tamil Nadu</Text>
+          <Text style={styles.welcomeText}>
+            {t('welcome_back') || 'Welcome back,'}
+          </Text>
+          <Text style={styles.userName}>{userName}</Text>
+          <Text style={styles.welcomeSubtext}>
+            {t('welcome_subtext') || 'Book your journey across Tamil Nadu'}
+          </Text>
         </View>
 
         {/* Quick Stats */}
@@ -68,17 +118,23 @@ export default function HomeScreen() {
           <View style={styles.statCard}>
             <BusIcon size={24} color="#DC2626" />
             <Text style={styles.statValue}>2,500+</Text>
-            <Text style={styles.statLabel}>Daily Services</Text>
+            <Text style={styles.statLabel}>
+              {t('daily_services') || 'Daily Services'}
+            </Text>
           </View>
           <View style={styles.statCard}>
             <MapPin size={24} color="#DC2626" />
             <Text style={styles.statValue}>500+</Text>
-            <Text style={styles.statLabel}>Destinations</Text>
+            <Text style={styles.statLabel}>
+              {t('destinations') || 'Destinations'}
+            </Text>
           </View>
           <View style={styles.statCard}>
             <Star size={24} color="#DC2626" />
             <Text style={styles.statValue}>4.2</Text>
-            <Text style={styles.statLabel}>Avg Rating</Text>
+            <Text style={styles.statLabel}>
+              {t('avg_rating') || 'Avg Rating'}
+            </Text>
           </View>
         </View>
 
@@ -95,19 +151,33 @@ export default function HomeScreen() {
 
         {/* Popular Routes */}
         <View style={styles.popularRoutes}>
-          <Text style={styles.sectionTitle}>Popular Routes</Text>
+          <Text style={styles.sectionTitle}>
+            {t('popular_routes') || 'Popular Routes'}
+          </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <TouchableOpacity style={styles.routeCard}>
-              <Text style={styles.routeText}>Chennai → Madurai</Text>
-              <Text style={styles.routePrice}>From ₹280</Text>
+              <Text style={styles.routeText}>
+                {t('city_chennai')} → {t('city_madurai')}
+              </Text>
+              <Text style={styles.routePrice}>
+                {t('from_price').replace('{price}', '₹280') || 'From ₹280'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.routeCard}>
-              <Text style={styles.routeText}>Chennai → Coimbatore</Text>
-              <Text style={styles.routePrice}>From ₹320</Text>
+              <Text style={styles.routeText}>
+                {t('city_chennai')} → {t('city_coimbatore')}
+              </Text>
+              <Text style={styles.routePrice}>
+                {t('from_price').replace('{price}', '₹320') || 'From ₹320'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.routeCard}>
-              <Text style={styles.routeText}>Madurai → Tirunelveli</Text>
-              <Text style={styles.routePrice}>From ₹120</Text>
+              <Text style={styles.routeText}>
+                {t('city_madurai')} → {t('city_tirunelveli')}
+              </Text>
+              <Text style={styles.routePrice}>
+                {t('from_price').replace('{price}', '₹120') || 'From ₹120'}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -115,10 +185,16 @@ export default function HomeScreen() {
         {/* Available Buses */}
         <View style={styles.busListHeader}>
           <Text style={styles.busListTitle}>
-            Available Buses ({filteredBuses.length})
+            {t('available_buses').replace(
+              '{count}',
+              String(filteredBuses.length)
+            ) || `Available Buses (${filteredBuses.length})`}
           </Text>
           <Text style={styles.busListSubtitle}>
-            {from} to {to} • {selectedDate.toLocaleDateString('en-IN')}
+            {t('city_' + from)} {t('to') || 'to'} {t('city_' + to)} •{' '}
+            {selectedDate.toLocaleDateString(
+              language === 'ta' ? 'ta-IN' : 'en-IN'
+            )}
           </Text>
         </View>
 
@@ -132,9 +208,12 @@ export default function HomeScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <BusIcon size={48} color="#DC2626" />
-              <Text style={styles.emptyText}>No buses found</Text>
+              <Text style={styles.emptyText}>
+                {t('no_buses_found') || 'No buses found'}
+              </Text>
               <Text style={styles.emptySubtext}>
-                Try selecting different cities or dates
+                {t('try_different_cities_dates') ||
+                  'Try selecting different cities or dates'}
               </Text>
             </View>
           }
@@ -142,10 +221,12 @@ export default function HomeScreen() {
 
         {/* Government Notice */}
         <View style={styles.noticeSection}>
-          <Text style={styles.noticeTitle}>Government Notice</Text>
+          <Text style={styles.noticeTitle}>
+            {t('government_notice') || 'Government Notice'}
+          </Text>
           <Text style={styles.noticeText}>
-            All passengers must carry valid ID proof during travel. 
-            Senior citizens and students are eligible for special discounts.
+            {t('gov_notice_text') ||
+              'All passengers must carry valid ID proof during travel. Senior citizens and students are eligible for special discounts.'}
           </Text>
         </View>
       </ScrollView>

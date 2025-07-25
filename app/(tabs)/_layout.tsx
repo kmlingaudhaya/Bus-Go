@@ -1,10 +1,12 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Bus, Ticket, MapPin, Bell, User } from 'lucide-react-native';
 
 export default function TabLayout() {
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   // Only show tabs for passengers
   if (user?.role !== 'passenger') {
@@ -35,7 +37,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Search',
+          title: t('search') || 'Search',
           tabBarIcon: ({ size, color }) => (
             <Bus size={size} color={color} />
           ),
@@ -44,7 +46,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="tickets"
         options={{
-          title: 'My Tickets',
+          title: t('my_tickets') || 'My Tickets',
           tabBarIcon: ({ size, color }) => (
             <Ticket size={size} color={color} />
           ),
@@ -53,7 +55,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="track"
         options={{
-          title: 'Track Trip',
+          title: t('track_bus') || 'Track Bus',
           tabBarIcon: ({ size, color }) => (
             <MapPin size={size} color={color} />
           ),
@@ -71,7 +73,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('profile') || 'Profile',
           tabBarIcon: ({ size, color }) => (
             <User size={size} color={color} />
           ),

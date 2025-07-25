@@ -13,7 +13,7 @@ export default function NotificationsScreen() {
   useEffect(() => {
     // Filter notifications for current user
     const userNotifications = mockNotifications.filter(
-      notification => notification.userId === user?.id
+      notification => String(notification.userId) === String(user?.user_id)
     );
     setNotifications(userNotifications);
   }, [user]);
