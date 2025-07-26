@@ -27,10 +27,10 @@ export default function RaiseTicketScreen() {
   ];
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Only allow passengers and conductors
+  // Only allow users and drivers
   useEffect(() => {
-    if (!user || user.role === 'staff') {
-      Alert.alert('Not allowed', 'Only users and conductors can raise a ticket.');
+    if (!user || user.role === 'manager') {
+      Alert.alert('Not allowed', 'Only users and drivers can raise a ticket.');
       router.replace('/');
     }
   }, [user]);

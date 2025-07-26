@@ -21,9 +21,9 @@ export default function Index() {
     case 'user':
       return <Redirect href="/(tabs)" />;
     case 'driver':
-      return <Redirect href="/conductor/trips" />;
+      return <Redirect href="/driver/dashboard" />;
     case 'manager':
-      return <Redirect href="/staff/dashboard" />;
+      return <Redirect href="/manager/dashboard" />;
     default:
       return <Redirect href="/(tabs)" />;
   }

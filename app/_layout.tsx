@@ -17,8 +17,8 @@ export default function RootLayout() {
           <Stack.Screen name="profile" />
           <Stack.Screen name="auth" />
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="conductor" />
-          <Stack.Screen name="staff" />
+          <Stack.Screen name="driver" />
+          <Stack.Screen name="manager" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="+not-found" />
         </Stack>

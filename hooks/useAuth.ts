@@ -27,12 +27,27 @@ export function useAuth() {
     return authStore.logout();
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    return authStore.changePassword(currentPassword, newPassword);
+  };
+
+  const getCurrentUserProfile = async () => {
+    return authStore.getCurrentUserProfile();
+  };
+
+  const testConnection = async () => {
+    return authStore.testConnection();
+  };
+
   return {
     user,
     loading,
     login,
     register,
     logout,
+    changePassword,
+    getCurrentUserProfile,
+    testConnection,
     isAuthenticated: authStore.isAuthenticated(),
   };
 }

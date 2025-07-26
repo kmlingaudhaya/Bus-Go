@@ -52,11 +52,11 @@ export default function ProfileScreen() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'passenger':
+      case 'user':
         return '#2563EB';
-      case 'conductor':
+      case 'driver':
         return '#059669';
-      case 'staff':
+      case 'manager':
         return '#EA580C';
       default:
         return '#64748B';
@@ -65,11 +65,11 @@ export default function ProfileScreen() {
 
   const getRoleBackground = (role: string) => {
     switch (role) {
-      case 'passenger':
+      case 'user':
         return '#EFF6FF';
-      case 'conductor':
+      case 'driver':
         return '#ECFDF5';
-      case 'staff':
+      case 'manager':
         return '#FFF7ED';
       default:
         return '#F8FAFC';
@@ -78,12 +78,12 @@ export default function ProfileScreen() {
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'passenger':
-        return t('role_passenger');
-      case 'conductor':
-        return t('role_conductor');
-      case 'staff':
-        return t('role_staff');
+      case 'user':
+        return t('role_user');
+      case 'driver':
+        return t('role_driver');
+      case 'manager':
+        return t('role_manager');
       default:
         return t('role_user');
     }
@@ -216,23 +216,23 @@ export default function ProfileScreen() {
           </View>
         )}
         {/* Role-based extra info example */}
-        {user?.role === 'conductor' && (
+        {user?.role === 'driver' && (
           <View style={styles.infoRow}>
             <UserIcon size={20} color="#64748B" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('conductor_info')}</Text>
+              <Text style={styles.infoLabel}>{t('driver_info')}</Text>
               <Text style={styles.infoValue}>
-                {t('special_info_conductor')}
+                {t('special_info_driver')}
               </Text>
             </View>
           </View>
         )}
-        {user?.role === 'staff' && (
+        {user?.role === 'manager' && (
           <View style={styles.infoRow}>
             <UserIcon size={20} color="#64748B" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('staff_info')}</Text>
-              <Text style={styles.infoValue}>{t('special_info_staff')}</Text>
+              <Text style={styles.infoLabel}>{t('manager_info')}</Text>
+              <Text style={styles.infoValue}>{t('special_info_manager')}</Text>
             </View>
           </View>
         )}

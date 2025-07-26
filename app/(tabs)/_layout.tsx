@@ -2,14 +2,14 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Bus, Ticket, MapPin, Bell, User } from 'lucide-react-native';
+import { Bus, Ticket, MapPin, Bell, User, Home, AlertTriangle, Info } from 'lucide-react-native';
 
 export default function TabLayout() {
   const { user } = useAuth();
   const { t } = useLanguage();
 
-  // Only show tabs for passengers
-  if (user?.role !== 'passenger') {
+  // Only show tabs for users
+  if (user?.role !== 'user') {
     return null;
   }
 
@@ -34,6 +34,15 @@ export default function TabLayout() {
         },
       }}
     >
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: t('dashboard') || 'Dashboard',
+          tabBarIcon: ({ size, color }) => (
+            <Home size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{
@@ -61,7 +70,25 @@ export default function TabLayout() {
           ),
         }}
       />
-       <Tabs.Screen
+      <Tabs.Screen
+        name="grievances"
+        options={{
+          title: t('grievances') || 'Grievances',
+          tabBarIcon: ({ size, color }) => (
+            <AlertTriangle size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="trip-details"
+        options={{
+          title: t('trip_details') || 'Trip Details',
+          tabBarIcon: ({ size, color }) => (
+            <Info size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="notifications"
         options={{
           title: 'Notifications',

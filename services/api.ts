@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://safeway-backend-75xq.onrender.com/api';
+const API_BASE_URL = 'http://192.168.0.132:3001/api';
 
 export interface Trip {
   trip_id: number;
@@ -55,7 +55,7 @@ class ConductorAPI {
     };
 
     if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+      headers['x-auth-token'] = this.token;
     }
 
     console.log(`Making API request to: ${url}`);

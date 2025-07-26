@@ -59,7 +59,7 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
     ];
 
     let raiseTicketItem = null;
-    if (user?.role === 'passenger' || user?.role === 'conductor') {
+    if (user?.role === 'user' || user?.role === 'driver') {
       raiseTicketItem = {
         icon: Ticket,
         label: t('complaint'),
@@ -71,7 +71,7 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
     }
 
     switch (user?.role) {
-      case 'passenger':
+      case 'user':
         return [
           {
             icon: Bus,
@@ -91,57 +91,57 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
           ...(raiseTicketItem ? [raiseTicketItem] : []),
           ...commonItems,
         ];
-      case 'conductor':
+      case 'driver':
         return [
           {
             icon: Bus,
             label: t('my_trips') || 'My Trips',
-            route: '/conductor/trips',
+            route: '/driver/trips',
           },
           {
             icon: QrCode,
             label: t('qr_scanner') || 'QR Scanner',
-            route: '/conductor/scanner',
+            route: '/driver/scanner',
           },
           {
             icon: MapPin,
             label: t('trip_tracking') || 'Trip Tracking',
-            route: '/conductor/tracking',
+            route: '/driver/tracking',
           },
           {
             icon: Ticket,
             label: t('manual_booking') || 'Manual Booking',
-            route: '/conductor/booking',
+            route: '/driver/booking',
           },
           ...(raiseTicketItem ? [raiseTicketItem] : []),
           ...commonItems,
         ];
-      case 'staff':
+      case 'manager':
         return [
           {
             icon: BarChart3,
             label: t('dashboard') || 'Dashboard',
-            route: '/staff/dashboard',
+            route: '/manager/dashboard',
           },
           {
             icon: Bus,
             label: t('manage_buses') || 'Manage Buses',
-            route: '/staff/buses',
+            route: '/manager/buses',
           },
           {
             icon: Users,
             label: t('waiting_list') || 'Waiting List',
-            route: '/staff/waitlist',
+            route: '/manager/waitlist',
           },
           {
             icon: MapPin,
             label: t('trip_tracking') || 'Trip Tracking',
-            route: '/staff/tracking',
+            route: '/manager/tracking',
           },
           {
             icon: Ticket,
             label: t('offline_booking') || 'Offline Booking',
-            route: '/staff/booking',
+            route: '/manager/booking',
           },
           ...commonItems,
         ];
@@ -197,11 +197,11 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
                 <View>
                   <Text style={styles.userName}>{user?.username}</Text>
                   <Text style={styles.userRole}>
-                    {user?.role === 'passenger'
-                      ? t('passenger') || 'Passenger'
-                      : user?.role === 'conductor'
-                      ? t('conductor') || 'Conductor'
-                      : t('staff_member') || 'Staff Member'}
+                    {user?.role === 'user'
+                      ? t('user') || 'User'
+                      : user?.role === 'driver'
+                      ? t('driver') || 'Driver'
+                      : t('manager') || 'Manager'}
                   </Text>
                   {user?.user_id && (
                     <Text style={styles.employeeId}>

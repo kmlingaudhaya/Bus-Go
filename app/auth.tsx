@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
-import { Bus, Mail, Lock, User } from 'lucide-react-native';
+import { Bus, Mail, Lock, User, Phone, MapPin, Calendar, CreditCard, Heart } from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function AuthScreen() {
@@ -22,11 +22,43 @@ export default function AuthScreen() {
   const [firstname, setFirstname] = useState('');
   const [lastname, setLastname] = useState('');
   const [dof, setDof] = useState('');
-  const [role, setRole] = useState('passenger');
+  const [role, setRole] = useState('user');
   const [loading, setLoading] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+
+  // Role-specific fields
+  // Driver fields
+  const [managerUsername, setManagerUsername] = useState('');
+  const [organisation, setOrganisation] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
+  const [address, setAddress] = useState('');
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [licenseExpireDate, setLicenseExpireDate] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [emergencyContactNumber, setEmergencyContactNumber] = useState('');
+  const [gender, setGender] = useState('');
+  
+  // Manager fields
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [organization, setOrganization] = useState('');
+
+  // Dropdown states
+  const [showGenderDropdown, setShowGenderDropdown] = useState(false);
+  const [showBloodGroupDropdown, setShowBloodGroupDropdown] = useState(false);
 
   const { login, register } = useAuth();
   const { t, language } = useLanguage();
+
+  const genderOptions = ['Male', 'Female', 'Other'];
+  const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+  const validateDriverFields = () => {
+    if (!licenseNumber) {
+      Alert.alert(t('error'), 'License number is required for drivers');
+      return false;
+    }
+    return true;
+  };
 
   const handleAuth = async () => {
     if (isLogin) {
@@ -48,9 +80,15 @@ export default function AuthScreen() {
         Alert.alert(t('error'), t('fill_required_fields'));
         return;
       }
+
+      // Role-specific validation
+      if (role === 'driver' && !validateDriverFields()) {
+        return;
+      }
+
       setLoading(true);
       try {
-        await register({
+        const registrationData: any = {
           username,
           email,
           password,
@@ -58,7 +96,29 @@ export default function AuthScreen() {
           firstname,
           lastname,
           dof,
-        });
+        };
+
+        // Add role-specific fields
+        if (role === 'driver') {
+          registrationData.manager_username = managerUsername;
+          registrationData.organisation = organisation;
+          registrationData.mobile_number = mobileNumber;
+          registrationData.address = address;
+          registrationData.license_number = licenseNumber;
+          registrationData.license_expire_date = licenseExpireDate;
+          registrationData.blood_group = bloodGroup;
+          registrationData.emergency_contact_number = emergencyContactNumber;
+          registrationData.gender = gender;
+        } else if (role === 'manager') {
+          registrationData.phone_number = phoneNumber;
+          registrationData.organization = organization;
+          registrationData.address = address;
+        } else if (role === 'user') {
+          registrationData.phone_number = phoneNumber;
+          registrationData.gender = gender;
+        }
+
+        await register(registrationData);
         Alert.alert(t('success') || 'Success', t('registration_success') || 'Registration successful! Please log in.');
         setIsLogin(true);
       } catch (error: any) {
@@ -67,6 +127,265 @@ export default function AuthScreen() {
         setLoading(false);
       }
     }
+  };
+
+  const renderRoleSpecificFields = () => {
+    if (role === 'driver') {
+      return (
+        <>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>License Number *</Text>
+            <View style={styles.inputWrapper}>
+              <CreditCard size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your license number"
+                value={licenseNumber}
+                onChangeText={setLicenseNumber}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Manager Username</Text>
+            <View style={styles.inputWrapper}>
+              <User size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter manager username"
+                value={managerUsername}
+                onChangeText={setManagerUsername}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Organisation</Text>
+            <View style={styles.inputWrapper}>
+              <MapPin size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter organisation name"
+                value={organisation}
+                onChangeText={setOrganisation}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Mobile Number</Text>
+            <View style={styles.inputWrapper}>
+              <Phone size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter mobile number"
+                value={mobileNumber}
+                onChangeText={setMobileNumber}
+                keyboardType="phone-pad"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Address</Text>
+            <View style={styles.inputWrapper}>
+              <MapPin size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your address"
+                value={address}
+                onChangeText={setAddress}
+                multiline
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>License Expire Date</Text>
+            <View style={styles.inputWrapper}>
+              <Calendar size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                value={licenseExpireDate}
+                onChangeText={setLicenseExpireDate}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Blood Group</Text>
+            <View style={styles.inputWrapper}>
+              <Heart size={20} color="#6B7280" />
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowBloodGroupDropdown(!showBloodGroupDropdown)}
+              >
+                <Text style={bloodGroup ? styles.selectedText : styles.placeholderText}>
+                  {bloodGroup || 'Select blood group'}
+                </Text>
+              </TouchableOpacity>
+              {showBloodGroupDropdown && (
+                <View style={styles.dropdown}>
+                  {bloodGroupOptions.map(bg => (
+                    <TouchableOpacity 
+                      key={bg} 
+                      style={styles.dropdownItem} 
+                      onPress={() => { 
+                        setBloodGroup(bg); 
+                        setShowBloodGroupDropdown(false); 
+                      }}
+                    >
+                      <Text>{bg}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Emergency Contact Number</Text>
+            <View style={styles.inputWrapper}>
+              <Phone size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter emergency contact"
+                value={emergencyContactNumber}
+                onChangeText={setEmergencyContactNumber}
+                keyboardType="phone-pad"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Gender</Text>
+            <View style={styles.inputWrapper}>
+              <User size={20} color="#6B7280" />
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowGenderDropdown(!showGenderDropdown)}
+              >
+                <Text style={gender ? styles.selectedText : styles.placeholderText}>
+                  {gender || 'Select gender'}
+                </Text>
+              </TouchableOpacity>
+              {showGenderDropdown && (
+                <View style={styles.dropdown}>
+                  {genderOptions.map(g => (
+                    <TouchableOpacity 
+                      key={g} 
+                      style={styles.dropdownItem} 
+                      onPress={() => { 
+                        setGender(g); 
+                        setShowGenderDropdown(false); 
+                      }}
+                    >
+                      <Text>{g}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </>
+      );
+    } else if (role === 'manager') {
+      return (
+        <>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Phone Number</Text>
+            <View style={styles.inputWrapper}>
+              <Phone size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter phone number"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="phone-pad"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Organization</Text>
+            <View style={styles.inputWrapper}>
+              <MapPin size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter organization name"
+                value={organization}
+                onChangeText={setOrganization}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Address</Text>
+            <View style={styles.inputWrapper}>
+              <MapPin size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your address"
+                value={address}
+                onChangeText={setAddress}
+                multiline
+              />
+            </View>
+          </View>
+        </>
+      );
+    } else if (role === 'user') {
+      return (
+        <>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Phone Number</Text>
+            <View style={styles.inputWrapper}>
+              <Phone size={20} color="#6B7280" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter phone number"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="phone-pad"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Gender</Text>
+            <View style={styles.inputWrapper}>
+              <User size={20} color="#6B7280" />
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowGenderDropdown(!showGenderDropdown)}
+              >
+                <Text style={gender ? styles.selectedText : styles.placeholderText}>
+                  {gender || 'Select gender'}
+                </Text>
+              </TouchableOpacity>
+              {showGenderDropdown && (
+                <View style={styles.dropdown}>
+                  {genderOptions.map(g => (
+                    <TouchableOpacity 
+                      key={g} 
+                      style={styles.dropdownItem} 
+                      onPress={() => { 
+                        setGender(g); 
+                        setShowGenderDropdown(false); 
+                      }}
+                    >
+                      <Text>{g}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </>
+      );
+    }
+    return null;
   };
 
   return (
@@ -103,6 +422,34 @@ export default function AuthScreen() {
           {!isLogin && (
             <>
               <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>{t('role_label') || 'Role'} *</Text>
+                <View style={styles.inputWrapper}>
+                  <TouchableOpacity
+                    style={styles.input}
+                    onPress={() => setShowRoleDropdown(!showRoleDropdown)}
+                  >
+                    <Text style={styles.selectedText}>{t('role_' + role) || role}</Text>
+                  </TouchableOpacity>
+                  {showRoleDropdown && (
+                    <View style={styles.dropdown}>
+                      {['user', 'driver', 'manager'].map(r => (
+                        <TouchableOpacity 
+                          key={r} 
+                          style={styles.dropdownItem} 
+                          onPress={() => { 
+                            setRole(r); 
+                            setShowRoleDropdown(false); 
+                          }}
+                        >
+                          <Text>{t('role_' + r) || r}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>{t('username_label') || 'Username'} *</Text>
                 <View style={styles.inputWrapper}>
                   <User size={20} color="#6B7280" />
@@ -115,6 +462,7 @@ export default function AuthScreen() {
                   />
                 </View>
               </View>
+
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>{t('firstname_label') || 'First Name'}</Text>
                 <View style={styles.inputWrapper}>
@@ -127,6 +475,7 @@ export default function AuthScreen() {
                   />
                 </View>
               </View>
+
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>{t('lastname_label') || 'Last Name'}</Text>
                 <View style={styles.inputWrapper}>
@@ -139,10 +488,11 @@ export default function AuthScreen() {
                   />
                 </View>
               </View>
+
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>{t('dob_label') || 'Date of Birth'}</Text>
                 <View style={styles.inputWrapper}>
-                  <User size={20} color="#6B7280" />
+                  <Calendar size={20} color="#6B7280" />
                   <TextInput
                     style={styles.input}
                     placeholder={t('dob_placeholder') || 'YYYY-MM-DD'}
@@ -151,18 +501,8 @@ export default function AuthScreen() {
                   />
                 </View>
               </View>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{t('role_label') || 'Role'} *</Text>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('role_placeholder') || 'passenger, conductor, staff'}
-                    value={role}
-                    onChangeText={setRole}
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
+
+              {renderRoleSpecificFields()}
             </>
           )}
 
@@ -306,6 +646,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 16,
+    position: 'relative',
   },
   inputLabel: {
     fontSize: 14,
@@ -322,12 +663,43 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    position: 'relative',
   },
   input: {
     flex: 1,
     fontSize: 16,
     color: '#1F2937',
     marginLeft: 8,
+  },
+  selectedText: {
+    color: '#1F2937',
+    fontSize: 16,
+  },
+  placeholderText: {
+    color: '#9CA3AF',
+    fontSize: 16,
+  },
+  dropdown: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    zIndex: 1000,
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  dropdownItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   button: {
     backgroundColor: '#DC2626',
@@ -352,59 +724,5 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 14,
     fontWeight: '500',
-  },
-  quickLogin: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    marginBottom: 40,
-  },
-  quickLoginTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  quickLoginSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  quickLoginButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quickButton: {
-    flex: 1,
-    flexDirection: 'column',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderRadius: 8,
-    marginHorizontal: 4,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  passengerButton: {
-    backgroundColor: '#FEF2F2',
-  },
-  conductorButton: {
-    backgroundColor: '#FEF2F2',
-  },
-  staffButton: {
-    backgroundColor: '#FEF2F2',
-  },
-  quickButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#DC2626',
-    marginTop: 4,
   },
 });

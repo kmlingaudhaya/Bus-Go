@@ -1,4 +1,4 @@
-export type UserRole = 'passenger' | 'conductor' | 'staff';
+export type UserRole = 'user' | 'driver' | 'manager';
 
 export type User = {
   user_id: number;
@@ -9,6 +9,23 @@ export type User = {
   lastname?: string | null;
   dof?: string | null;
   created_at?: string | null;
+  
+  // Common fields
+  phone_number?: string | null;
+  gender?: string | null;
+  address?: string | null;
+  
+  // Driver-specific fields
+  manager_username?: string | null;
+  organisation?: string | null;
+  mobile_number?: string | null;
+  license_number?: string | null;
+  license_expire_date?: string | null;
+  blood_group?: string | null;
+  emergency_contact_number?: string | null;
+  
+  // Manager-specific fields
+  organization?: string | null;
 };
 
 export interface Bus {
