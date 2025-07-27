@@ -21,7 +21,7 @@ import {
 interface LeaderboardEntry {
   id: string;
   name: string;
-  role: 'driver' | 'conductor';
+  role: 'driver' | 'manager';
   score: number;
   rank: number;
   avatar?: string;
@@ -71,7 +71,7 @@ export default function ManagerLeaderboardScreen() {
     {
       id: '3',
       name: 'Priya Sharma',
-      role: 'conductor',
+      role: 'driver',
       score: 890,
       rank: 3,
       metrics: {
@@ -97,7 +97,7 @@ export default function ManagerLeaderboardScreen() {
     {
       id: '5',
       name: 'Lakshmi Devi',
-      role: 'conductor',
+      role: 'manager',
       score: 860,
       rank: 5,
       metrics: {

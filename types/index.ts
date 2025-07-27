@@ -89,24 +89,28 @@ export interface WaitingList {
 }
 
 export interface Trip {
-  id: string;
-  busId: string;
-  conductorId: string;
-  route: Route;
-  status: 'assigned' | 'accepted' | 'started' | 'completed' | 'cancelled';
-  vehicleNumber: string;
-  depotCode: string;
-  currentLocation?: {
-    latitude: number;
-    longitude: number;
-    locationName: string;
-  };
-  scheduledDeparture: Date;
-  actualDeparture?: Date;
-  scheduledArrival: Date;
-  actualArrival?: Date;
-  passengersBoarded: number;
-  revenue: number;
+  trip_id: number;
+  vehicle_id: number | null;
+  start_time: string;
+  end_time?: string | null;
+  start_location?: string | null;
+  end_location?: string | null;
+  distance_travelled?: number | null;
+  average_speed?: number | null;
+  max_speed?: number | null;
+  min_speed?: number | null;
+  fuel_consumed?: number | null;
+  harsh_events_count?: number | null;
+  trip_status: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  address?: string | null;
+  driver_username?: string | null;
+  manager_username?: string | null;
+  // Additional fields from joins
+  mobile_number?: string | null;
+  license_number?: string | null;
+  emergency_contact_number?: string | null;
 }
 
 export interface Notification {

@@ -1,124 +1,162 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+} from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
-import Navbar from '@/components/Navbar';
-import { mockNotifications } from '@/data/mockData';
-import { Notification } from '@/types';
-import { Bell, Clock, Ticket, Bus, Settings, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  Bell,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  Clock,
+} from 'lucide-react-native';
 
-export default function NotificationsScreen() {
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  timestamp: Date;
+  read: boolean;
+}
+
+export default function ManagerNotificationsScreen() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Mock notifications data
+  const mockNotifications: Notification[] = [
+    {
+      id: '1',
+      title: 'New Driver Registration',
+      message: 'A new driver has registered and is pending approval.',
+      type: 'info',
+      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+      read: false,
+    },
+    {
+      id: '2',
+      title: 'Vehicle Maintenance Due',
+      message: 'Vehicle TN-01-AB-1234 is due for maintenance.',
+      type: 'warning',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+      read: false,
+    },
+    {
+      id: '3',
+      title: 'Trip Completed Successfully',
+      message: 'Trip #12345 from Chennai to Coimbatore completed successfully.',
+      type: 'success',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
+      read: true,
+    },
+    {
+      id: '4',
+      title: 'Emergency Alert',
+      message: 'Driver reported an emergency on Route 45.',
+      type: 'error',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
+      read: true,
+    },
+  ];
 
   useEffect(() => {
-    // Filter notifications for current user
-    const userNotifications = mockNotifications.filter(
-      notification => String(notification.userId) === String(user?.user_id)
-    );
-    setNotifications(userNotifications);
-  }, [user]);
+    loadNotifications();
+  }, []);
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'booking': return Ticket;
-      case 'trip': return Bus;
-      case 'delay': return Clock;
-      case 'cancellation': return AlertCircle;
-      case 'system': return Settings;
-      default: return Bell;
-    }
+  const loadNotifications = () => {
+    // In a real app, this would fetch from an API
+    setNotifications(mockNotifications);
   };
 
-  const getNotificationColor = (type: string, priority: string) => {
-    if (priority === 'high') return '#DC2626';
-    switch (type) {
-      case 'booking': return '#3B82F6';
-      case 'trip': return '#10B981';
-      case 'delay': return '#F59E0B';
-      case 'cancellation': return '#EF4444';
-      case 'system': return '#8B5CF6';
-      default: return '#6B7280';
-    }
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    loadNotifications();
+    setRefreshing(false);
   };
 
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 60) {
-      return `${diffInMinutes}m ago`;
-    } else if (diffInMinutes < 24 * 60) {
-      return `${Math.floor(diffInMinutes / 60)}h ago`;
-    } else {
-      return date.toLocaleDateString('en-IN');
-    }
-  };
-
-  const markAsRead = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === notificationId 
-          ? { ...notification, read: true }
-          : notification
+  const markAsRead = (id: string) => {
+    setNotifications(prev =>
+      prev.map(notification =>
+        notification.id === id ? { ...notification, read: true } : notification
       )
     );
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    );
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'info':
+        return <Info size={20} color="#3B82F6" />;
+      case 'warning':
+        return <AlertCircle size={20} color="#F59E0B" />;
+      case 'success':
+        return <CheckCircle size={20} color="#10B981" />;
+      case 'error':
+        return <AlertCircle size={20} color="#DC2626" />;
+      default:
+        return <Bell size={20} color="#6B7280" />;
+    }
   };
 
-  const renderNotification = ({ item }: { item: Notification }) => {
-    const Icon = getNotificationIcon(item.type);
-    const color = getNotificationColor(item.type, item.priority);
+  const formatTimestamp = (timestamp: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - timestamp.getTime();
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    return (
-      <TouchableOpacity
-        style={[
-          styles.notificationCard,
-          !item.read && styles.unreadNotification,
-          item.priority === 'high' && styles.highPriorityNotification
-        ]}
-        onPress={() => markAsRead(item.id)}
-      >
-        <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
-          <Icon size={20} color={color} />
+    if (minutes < 60) {
+      return `${minutes}m ago`;
+    } else if (hours < 24) {
+      return `${hours}h ago`;
+    } else {
+      return `${days}d ago`;
+    }
+  };
+
+  const renderNotification = ({ item }: { item: Notification }) => (
+    <TouchableOpacity
+      style={[styles.notificationCard, !item.read && styles.unreadCard]}
+      onPress={() => markAsRead(item.id)}
+    >
+      <View style={styles.notificationHeader}>
+        <View style={styles.iconContainer}>
+          {getNotificationIcon(item.type)}
         </View>
-        
         <View style={styles.notificationContent}>
-          <View style={styles.notificationHeader}>
-            <Text style={styles.notificationTitle}>{item.title}</Text>
-            {item.priority === 'high' && (
-              <View style={styles.priorityBadge}>
-                <Text style={styles.priorityText}>HIGH</Text>
-              </View>
-            )}
-          </View>
+          <Text style={[styles.notificationTitle, !item.read && styles.unreadTitle]}>
+            {item.title}
+          </Text>
           <Text style={styles.notificationMessage}>{item.message}</Text>
-          <View style={styles.notificationFooter}>
-            <Clock size={12} color="#9CA3AF" />
-            <Text style={styles.notificationTime}>{formatTime(item.createdAt)}</Text>
-            {!item.read && <View style={styles.unreadDot} />}
-          </View>
         </View>
-      </TouchableOpacity>
-    );
-  };
+        <View style={styles.timestampContainer}>
+          <Clock size={14} color="#6B7280" />
+          <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
+        </View>
+      </View>
+      {!item.read && <View style={styles.unreadIndicator} />}
+    </TouchableOpacity>
+  );
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <View style={styles.container}>
-      <Navbar title="Notifications" notificationCount={unreadCount} />
-
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>All Notifications</Text>
+        <Text style={styles.title}>{t('notifications') || 'Notifications'}</Text>
         {unreadCount > 0 && (
-          <TouchableOpacity style={styles.markAllButton} onPress={markAllAsRead}>
-            <Text style={styles.markAllText}>Mark all as read</Text>
-          </TouchableOpacity>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{unreadCount}</Text>
+          </View>
         )}
       </View>
 
@@ -126,13 +164,16 @@ export default function NotificationsScreen() {
         data={notifications}
         keyExtractor={(item) => item.id}
         renderItem={renderNotification}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Bell size={48} color="#D1D5DB" />
-            <Text style={styles.emptyText}>No notifications yet</Text>
-            <Text style={styles.emptySubtext}>
-              You'll see updates about your bookings and trips here
+            <Bell size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>
+              {t('no_notifications') || 'No notifications yet'}
             </Text>
           </View>
         }
@@ -152,122 +193,99 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 20,
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  headerTitle: {
-    fontSize: 20,
+  title: {
+    fontSize: 24,
     fontWeight: '700',
     color: '#1F2937',
   },
-  markAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 6,
+  badge: {
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 24,
+    alignItems: 'center',
   },
-  markAllText: {
+  badgeText: {
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
-    color: '#DC2626',
   },
   listContainer: {
-    flexGrow: 1,
     padding: 16,
   },
   notificationCard: {
-    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
+    position: 'relative',
   },
-  unreadNotification: {
+  unreadCard: {
     borderLeftWidth: 4,
     borderLeftColor: '#DC2626',
   },
-  highPriorityNotification: {
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
+  notificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginRight: 12,
+    marginTop: 2,
   },
   notificationContent: {
     flex: 1,
-  },
-  notificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+    marginRight: 12,
   },
   notificationTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    flex: 1,
+    marginBottom: 4,
   },
-  priorityBadge: {
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  priorityText: {
-    fontSize: 10,
+  unreadTitle: {
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   notificationMessage: {
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 20,
-    marginBottom: 8,
   },
-  notificationFooter: {
+  timestampContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  notificationTime: {
+  timestamp: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginLeft: 4,
   },
-  unreadDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  unreadIndicator: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#DC2626',
-    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
-    paddingTop: 100,
+    alignItems: 'center',
+    paddingVertical: 60,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtext: {
     fontSize: 16,
     color: '#9CA3AF',
-    textAlign: 'center',
-    lineHeight: 24,
+    marginTop: 16,
   },
 });

@@ -2,11 +2,11 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import {
   Home,
-  List,
+  MapPin,
   Users,
-  Bell,
+  Truck,
+  Trophy,
   User,
-  AlertCircle,
 } from 'lucide-react-native';
 
 export default function StaffTabLayout() {
@@ -38,7 +38,7 @@ export default function StaffTabLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Home',
+          title: 'Dashboard',
           tabBarIcon: ({ size, color }) => <Home size={size} color={color} />,
         }}
       />
@@ -46,30 +46,29 @@ export default function StaffTabLayout() {
         name="trips"
         options={{
           title: 'Trips',
-          tabBarIcon: ({ size, color }) => <List size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <MapPin size={size} color={color} />,
+        }}
+      />
+      
+      <Tabs.Screen
+        name="vehicles"
+        options={{
+          title: 'Vehicles',
+          tabBarIcon: ({ size, color }) => <Truck size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="conductors"
+        name="drivers"
         options={{
-          title: 'Conductors',
+          title: 'Drivers',
           tabBarIcon: ({ size, color }) => <Users size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="leaderboard"
         options={{
-          title: 'Notifications',
-          tabBarIcon: ({ size, color }) => <Bell size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="grievances"
-        options={{
-          title: 'Grievances',
-          tabBarIcon: ({ size, color }) => (
-            <AlertCircle size={size} color={color} />
-          ),
+          title: 'Leaderboard',
+          tabBarIcon: ({ size, color }) => <Trophy size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -79,7 +78,6 @@ export default function StaffTabLayout() {
           tabBarIcon: ({ size, color }) => <User size={size} color={color} />,
         }}
       />
-      
     </Tabs>
   );
 }

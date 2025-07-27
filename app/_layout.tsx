@@ -19,6 +19,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="driver" />
           <Stack.Screen name="manager" />
+          <Stack.Screen name="trip-details" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="+not-found" />
         </Stack>

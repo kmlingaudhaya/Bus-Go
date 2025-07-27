@@ -9,29 +9,54 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { conductorAPI, Trip as APITrip } from '@/services/api';
+import { useAuth } from '@/hooks/useAuth';
+import { getTripsByManager, Trip } from '@/services/api';
+import { router } from 'expo-router';
 import {
   MapPin,
   Bus,
   Clock,
   User as UserIcon,
   Navigation,
+  Filter,
+  ArrowRight,
+  Calendar,
 } from 'lucide-react-native';
 
-export default function StaffTripsScreen() {
-  const [trips, setTrips] = useState<APITrip[]>([]);
+type TripStatus = 'all' | 'scheduled' | 'in_progress' | 'completed';
+
+export default function ManagerTripsScreen() {
+  const { user } = useAuth();
+  const [allTrips, setAllTrips] = useState<Trip[]>([]);
+  const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<TripStatus>('all');
+
+  const filterOptions: { key: TripStatus; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'scheduled', label: 'Scheduled' },
+    { key: 'in_progress', label: 'Active' },
+    { key: 'completed', label: 'Completed' },
+  ];
 
   useEffect(() => {
-    fetchTripsWithConductorInfo();
-  }, []);
+    if (user?.username) {
+      fetchAllTrips();
+    }
+  }, [user]);
 
-  const fetchTripsWithConductorInfo = async () => {
+  useEffect(() => {
+    applyFilter();
+  }, [allTrips, selectedFilter]);
+
+  const fetchAllTrips = async () => {
+    if (!user?.username) return;
+    
     setLoading(true);
     try {
-      const data = await conductorAPI.getAllTripsWithConductorInfo();
-      setTrips(data);
+      const data = await getTripsByManager(user.username);
+      setAllTrips(data);
     } catch (e: any) {
       console.error('Error fetching trips:', e);
 
@@ -45,169 +70,189 @@ export default function StaffTripsScreen() {
           'Unable to connect to the server. Please check your internet connection and try again.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Retry', onPress: () => fetchTripsWithConductorInfo() },
+            { text: 'Retry', onPress: () => fetchAllTrips() },
           ]
         );
       } else {
         Alert.alert('Error', e.message || 'Failed to fetch trips');
       }
-      setTrips([]);
+      setAllTrips([]);
     }
     setLoading(false);
   };
 
+  const applyFilter = () => {
+    if (selectedFilter === 'all') {
+      setFilteredTrips(allTrips);
+    } else {
+      const filtered = allTrips.filter(trip => trip.trip_status === selectedFilter);
+      setFilteredTrips(filtered);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchTripsWithConductorInfo();
+    await fetchAllTrips();
     setRefreshing(false);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return '#F59E0B';
-      case 'scheduled':
-        return '#10B981';
-      case 'in_progress':
-        return '#3B82F6';
-      case 'completed':
-        return '#6B7280';
-      case 'cancelled':
-        return '#EF4444';
-      default:
-        return '#6B7280';
-    }
-  };
-
-  const getStatusBgColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return '#FEF3C7';
-      case 'scheduled':
-        return '#D1FAE5';
-      case 'in_progress':
-        return '#DBEAFE';
-      case 'completed':
-        return '#F3F4F6';
-      case 'cancelled':
-        return '#FEE2E2';
-      default:
-        return '#F3F4F6';
-    }
-  };
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
     });
   };
 
-  const renderTrip = ({ item }: { item: APITrip }) => (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <View style={styles.tripInfo}>
-          <Text style={styles.tripId}>Trip #{item.trip_id}</Text>
-          <Text style={styles.route}>
-            {item.start_location} → {item.end_location}
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getFilterCount = (status: TripStatus) => {
+    if (status === 'all') return allTrips.length;
+    return allTrips.filter(trip => trip.trip_status === status).length;
+  };
+
+  const handleTripPress = (trip: Trip) => {
+    try {
+      const tripData = encodeURIComponent(JSON.stringify(trip));
+      
+      switch (trip.trip_status) {
+        case 'completed':
+          router.push(`/trip-details/completed?trip=${tripData}`);
+          break;
+        case 'in_progress':
+          router.push(`/trip-details/active?trip=${tripData}`);
+          break;
+        case 'scheduled':
+          router.push(`/trip-details/scheduled?trip=${tripData}`);
+          break;
+        default:
+          // For other statuses, show basic details
+          router.push(`/trip-details/completed?trip=${tripData}`);
+          break;
+      }
+    } catch (error) {
+      console.error('Error navigating to trip details:', error);
+      Alert.alert('Error', 'Failed to open trip details');
+    }
+  };
+
+  const renderFilterButton = (option: { key: TripStatus; label: string }) => (
+    <TouchableOpacity
+      key={option.key}
+      style={[
+        styles.filterButton,
+        selectedFilter === option.key && styles.selectedFilterButton,
+      ]}
+      onPress={() => setSelectedFilter(option.key)}
+    >
+      <Text
+        style={[
+          styles.filterButtonText,
+          selectedFilter === option.key && styles.selectedFilterButtonText,
+        ]}
+      >
+        {option.label}
+      </Text>
+      <View style={styles.filterCount}>
+        <Text style={styles.filterCountText}>{getFilterCount(option.key)}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderTrip = ({ item }: { item: Trip }) => (
+    <TouchableOpacity style={styles.card} onPress={() => handleTripPress(item)}>
+      {/* Trip Route Information */}
+      <View style={styles.routeContainer}>
+        {/* Start Location */}
+        <View style={styles.locationContainer}>
+          <View style={styles.locationHeader}>
+            <MapPin size={16} color="#10B981" />
+            <Text style={styles.locationLabel}>From</Text>
+          </View>
+          <Text style={styles.locationName}>{item.start_location || 'N/A'}</Text>
+          <View style={styles.dateTimeContainer}>
+            <View style={styles.dateTimeRow}>
+              <Calendar size={14} color="#6B7280" />
+              <Text style={styles.dateTimeText}>{formatDate(item.start_time)}</Text>
+            </View>
+            <View style={styles.dateTimeRow}>
+              <Clock size={14} color="#6B7280" />
+              <Text style={styles.dateTimeText}>{formatTime(item.start_time)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Arrow */}
+        <View style={styles.arrowContainer}>
+          <ArrowRight size={24} color="#DC2626" />
+        </View>
+
+        {/* End Location */}
+        <View style={styles.locationContainer}>
+          <View style={styles.locationHeader}>
+            <MapPin size={16} color="#EF4444" />
+            <Text style={styles.locationLabel}>To</Text>
+          </View>
+          <Text style={styles.locationName}>{item.end_location || 'N/A'}</Text>
+          <View style={styles.dateTimeContainer}>
+            {item.end_time ? (
+              <>
+                <View style={styles.dateTimeRow}>
+                  <Calendar size={14} color="#6B7280" />
+                  <Text style={styles.dateTimeText}>{formatDate(item.end_time)}</Text>
+                </View>
+                <View style={styles.dateTimeRow}>
+                  <Clock size={14} color="#6B7280" />
+                  <Text style={styles.dateTimeText}>{formatTime(item.end_time)}</Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.pendingText}>Pending</Text>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Trip Details */}
+      <View style={styles.tripDetailsContainer}>
+        <View style={styles.tripDetailItem}>
+          <Text style={styles.tripDetailLabel}>Trip ID</Text>
+          <Text style={styles.tripDetailValue}>#{item.trip_id}</Text>
+        </View>
+        <View style={styles.tripDetailItem}>
+          <Text style={styles.tripDetailLabel}>Driver ID</Text>
+          <Text style={styles.tripDetailValue} numberOfLines={2}>
+            {item.driver_username || 'N/A'}
           </Text>
         </View>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusBgColor(item.trip_status) },
-          ]}
-        >
-          <Text
-            style={[
-              styles.statusText,
-              { color: getStatusColor(item.trip_status) },
-            ]}
-          >
+        <View style={styles.tripDetailItem}>
+          <Text style={styles.tripDetailLabel}>Vehicle ID</Text>
+          <Text style={styles.tripDetailValue}>{item.vehicle_id || 'N/A'}</Text>
+        </View>
+        <View style={styles.tripDetailItem}>
+          <Text style={styles.tripDetailLabel}>Status</Text>
+          <Text style={styles.tripDetailValue} numberOfLines={2}>
             {item.trip_status.toUpperCase().replace('_', ' ')}
           </Text>
         </View>
       </View>
 
-      <View style={styles.details}>
-        <View style={styles.detailRow}>
-          <Bus size={16} color="#6B7280" />
-          <Text style={styles.detailText}>
-            Vehicle: {item.vehicle_number || 'N/A'}
-          </Text>
-        </View>
-
-        {item.driver_first_name && (
-          <View style={styles.detailRow}>
-            <UserIcon size={16} color="#6B7280" />
-            <Text style={styles.detailText}>
-              Driver: {item.driver_first_name} {item.driver_last_name || ''}
-            </Text>
-          </View>
-        )}
-
-        {item.conductor_username && (
-          <View style={styles.detailRow}>
-            <UserIcon size={16} color="#DC2626" />
-            <Text style={styles.detailText}>
-              Conductor: {item.conductor_username}
-              {item.conductor_firstname &&
-                ` (${item.conductor_firstname} ${
-                  item.conductor_lastname || ''
-                })`}
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.detailRow}>
-          <Clock size={16} color="#6B7280" />
-          <Text style={styles.detailText}>
-            Start: {formatDateTime(item.start_time)}
-          </Text>
-        </View>
-
-        {item.end_time && (
-          <View style={styles.detailRow}>
-            <Clock size={16} color="#6B7280" />
-            <Text style={styles.detailText}>
-              End: {formatDateTime(item.end_time)}
-            </Text>
-          </View>
-        )}
-
-        {item.distance_travelled && (
-          <View style={styles.detailRow}>
-            <Navigation size={16} color="#6B7280" />
-            <Text style={styles.detailText}>
-              Distance: {item.distance_travelled} km
-            </Text>
-          </View>
-        )}
-
-        {item.average_speed && (
-          <View style={styles.detailRow}>
-            <Navigation size={16} color="#6B7280" />
-            <Text style={styles.detailText}>
-              Avg Speed: {item.average_speed} km/h
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Real-time Location */}
+      {/* Real-time Location for Active Trips */}
       {item.latitude &&
         item.longitude &&
         item.trip_status === 'in_progress' && (
           <View style={styles.locationInfo}>
-            <View style={styles.locationHeader}>
+            <View style={styles.locationInfoHeader}>
               <MapPin size={16} color="#DC2626" />
-              <Text style={styles.locationTitle}>Live Location</Text>
+              <Text style={styles.locationInfoTitle}>Live Location</Text>
             </View>
 
-            <Text style={styles.locationText}>
+            <Text style={styles.locationInfoText}>
               {item.address ||
                 `GPS: ${item.latitude.toFixed(4)}, ${item.longitude.toFixed(
                   4
@@ -225,50 +270,35 @@ export default function StaffTripsScreen() {
           </View>
         )}
 
-      {/* Trip Statistics */}
-      {(item.distance_travelled || item.average_speed || item.max_speed) && (
-        <View style={styles.statsContainer}>
-          <Text style={styles.statsTitle}>Trip Statistics</Text>
-          <View style={styles.statsGrid}>
-            {item.distance_travelled && (
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Distance</Text>
-                <Text style={styles.statValue}>
-                  {item.distance_travelled} km
-                </Text>
-              </View>
-            )}
-            {item.average_speed && (
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Avg Speed</Text>
-                <Text style={styles.statValue}>{item.average_speed} km/h</Text>
-              </View>
-            )}
-            {item.max_speed && (
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Max Speed</Text>
-                <Text style={styles.statValue}>{item.max_speed} km/h</Text>
-              </View>
-            )}
-            {item.fuel_consumed && (
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Fuel Used</Text>
-                <Text style={styles.statValue}>{item.fuel_consumed} L</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-    </View>
+      {/* Tap to View Details Indicator */}
+      <View style={styles.tapIndicator}>
+        <Text style={styles.tapText}>Tap to view details</Text>
+        <ArrowRight size={16} color="#DC2626" />
+      </View>
+    </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>All Trips</Text>
-      <Text style={styles.subtitle}>
-        Real-time trip monitoring and conductor tracking
-      </Text>
+      <View style={styles.headerContainer}>
+        <Text style={styles.title}>Trip Management</Text>
+        <Text style={styles.subtitle}>
+          Monitor and manage all trips under your supervision
+        </Text>
+      </View>
 
+      {/* Filter Buttons */}
+      <View style={styles.filtersContainer}>
+        <View style={styles.filtersHeader}>
+          <Filter size={16} color="#6B7280" />
+          <Text style={styles.filtersTitle}>Filter by Status</Text>
+        </View>
+        <View style={styles.filtersGrid}>
+          {filterOptions.map(renderFilterButton)}
+        </View>
+      </View>
+
+      {/* Trip List */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#DC2626" />
@@ -276,18 +306,23 @@ export default function StaffTripsScreen() {
         </View>
       ) : (
         <FlatList
-          data={trips}
+          data={filteredTrips}
           keyExtractor={(item) => item.trip_id.toString()}
           renderItem={renderTrip}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No trips found.</Text>
+              <Text style={styles.emptyText}>
+                {selectedFilter === 'all' 
+                  ? 'No trips found.' 
+                  : `No ${selectedFilter.replace('_', ' ')} trips found.`}
+              </Text>
               <TouchableOpacity
                 style={styles.retryButton}
-                onPress={fetchTripsWithConductorInfo}
+                onPress={fetchAllTrips}
               >
                 <Text style={styles.retryButtonText}>Retry</Text>
               </TouchableOpacity>
@@ -303,21 +338,88 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-    padding: 16,
+  },
+  headerContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    paddingTop: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#DC2626', // changed from blue
-    marginBottom: 16,
+    color: '#DC2626',
     textAlign: 'center',
-    paddingTop: 25,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
     color: '#64748B',
-    marginBottom: 20,
     textAlign: 'center',
+  },
+  filtersContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  filtersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  filtersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginLeft: 8,
+  },
+  filtersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+  },
+  selectedFilterButton: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 6,
+    color: '#6B7280',
+  },
+  selectedFilterButtonText: {
+    color: '#FFFFFF',
+  },
+  filterCount: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    backgroundColor: '#6B7280',
+  },
+  filterCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  listContainer: {
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -339,6 +441,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#64748B',
     marginBottom: 15,
+    textAlign: 'center',
   },
   retryButton: {
     backgroundColor: '#DC2626',
@@ -353,76 +456,112 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
   },
-  header: {
+  routeContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
   },
-  tripInfo: {
+  locationContainer: {
     flex: 1,
-  },
-  tripId: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 2,
-  },
-  route: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 5,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  details: {
-    marginTop: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#475569',
-    marginLeft: 8,
-  },
-  locationInfo: {
-    marginTop: 12,
-    backgroundColor: '#F0F9EB', // Light green background
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#10B981', // Green border
   },
   locationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginLeft: 6,
+    textTransform: 'uppercase',
+  },
+  locationName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  dateTimeContainer: {
+    gap: 4,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dateTimeText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginLeft: 6,
+  },
+  pendingText: {
+    fontSize: 13,
+    color: '#F59E0B',
+    fontStyle: 'italic',
+  },
+  arrowContainer: {
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  tripDetailsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  tripDetailItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 2,
+    minHeight: 50,
+    justifyContent: 'center',
+  },
+  tripDetailLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '600',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  tripDetailValue: {
+    fontSize: 11,
+    color: '#1F2937',
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 14,
+    flexWrap: 'wrap',
+  },
+  locationInfo: {
+    backgroundColor: '#F0F9EB',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+    marginBottom: 16,
+  },
+  locationInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 6,
   },
-  locationTitle: {
+  locationInfoTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#10B981', // Green color
+    color: '#10B981',
     marginLeft: 8,
   },
-  locationText: {
+  locationInfoText: {
     fontSize: 14,
     color: '#374151',
     marginBottom: 6,
@@ -435,38 +574,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
   },
-  statsContainer: {
-    marginTop: 12,
-    backgroundColor: '#F9FAFB', // Light gray background
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E0E7FF', // Blue border
-  },
-  statsTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  statsGrid: {
+  tapIndicator: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    width: '45%', // Two items per row
-    marginBottom: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
-  statLabel: {
+  tapText: {
     fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#DC2626',
+    fontWeight: '600',
+    marginRight: 4,
   },
 });
