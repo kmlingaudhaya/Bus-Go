@@ -21,13 +21,13 @@ import {
   Play,
   Bus,
 } from 'lucide-react-native';
-import { conductorAPI, Trip as APITrip } from '@/services/api';
+import { getTripsByDriver, updateTripStatus, testConnection, getServerInfo, Trip as APITrip } from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-export default function ConductorTripsScreen() {
+export default function DriverTripsScreen() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [assignedTrips, setAssignedTrips] = useState<APITrip[]>([]);
@@ -44,7 +44,7 @@ export default function ConductorTripsScreen() {
   useFocusEffect(
     React.useCallback(() => {
       if (user?.username) {
-        fetchConductorTrips();
+        fetchDriverTrips();
       }
     }, [user?.username])
   );
@@ -52,16 +52,16 @@ export default function ConductorTripsScreen() {
   useEffect(() => {
     if (user?.username) {
       // Test connection first
-      const testConnection = async () => {
+      const testConnectionAsync = async () => {
         console.log('🔍 Testing API connection...');
-        const serverInfo = conductorAPI.getServerInfo();
+        const serverInfo = getServerInfo();
         console.log('Server Info:', serverInfo);
 
-        const isConnected = await conductorAPI.testConnection();
+        const isConnected = await testConnection();
         console.log('Connection test result:', isConnected);
 
         if (isConnected) {
-          fetchConductorTrips();
+          fetchDriverTrips();
         } else {
           setNetworkStatus('offline');
           Alert.alert(
@@ -69,29 +69,24 @@ export default function ConductorTripsScreen() {
             `Unable to connect to server at ${serverInfo.baseUrl}. Please check if the server is running.`,
             [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Retry', onPress: () => fetchConductorTrips() },
+              { text: 'Retry', onPress: () => fetchDriverTrips() },
             ]
           );
         }
       };
 
-      testConnection();
+      testConnectionAsync();
     }
   }, [user]);
 
-  const fetchConductorTrips = async () => {
+  const fetchDriverTrips = async () => {
     if (!user?.username) return;
 
     try {
       setLoading(true);
       setNetworkStatus('checking');
 
-      const token = await AsyncStorage.getItem('token');
-      if (token) {
-        conductorAPI.setToken(token);
-      }
-
-      const trips = await conductorAPI.getConductorTrips(user.username);
+      const trips = await getTripsByDriver(user.username);
       setAssignedTrips(trips);
       setNetworkStatus('online');
     } catch (error: any) {
@@ -108,7 +103,7 @@ export default function ConductorTripsScreen() {
           'Unable to connect to the server. Please check your internet connection and try again.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Retry', onPress: () => fetchConductorTrips() },
+            { text: 'Retry', onPress: () => fetchDriverTrips() },
           ]
         );
       } else {
@@ -147,7 +142,7 @@ export default function ConductorTripsScreen() {
                   newStatus = 'scheduled';
               }
 
-              await conductorAPI.updateTripStatus(trip.trip_id, newStatus);
+              await updateTripStatus(trip.trip_id, newStatus);
 
               // Update local state
               setAssignedTrips((prev) =>
@@ -235,7 +230,7 @@ export default function ConductorTripsScreen() {
       <ScrollView style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.greeting}>{t('good_morning')}</Text>
-          <Text style={styles.conductorName}>
+          <Text style={styles.driverName}>
             {user?.firstname
               ? `${user.firstname} ${user.lastname || ''}`
               : user?.username}
@@ -278,49 +273,6 @@ export default function ConductorTripsScreen() {
                 : t('checking_status')}
             </Text>
           </View>
-
-          {/* Debug Info */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={async () => {
-              try {
-                console.log('🔍 Debug: Checking conductor status...');
-                const status = await conductorAPI.checkConductorStatus(
-                  user?.username || ''
-                );
-                console.log('Debug status:', status);
-
-                const allTrips = await conductorAPI.getAllTrips();
-                console.log('Debug: Total trips in database:', allTrips.length);
-
-                const dbStats = await conductorAPI.getDatabaseStats();
-                console.log('Debug: Database stats:', dbStats);
-
-                Alert.alert(
-                  t('debug_info'),
-                  `Conductor: ${user?.username}\nExists: ${
-                    status.exists
-                  }\nHas Trips: ${status.hasTrips}\nTrip Count: ${
-                    status.tripCount
-                  }\n\nDatabase Stats:\nTotal Trips: ${
-                    dbStats.totalTrips
-                  }\nTrips with Conductors: ${
-                    dbStats.tripsWithConductors
-                  }\nUnique Conductors: ${
-                    dbStats.uniqueConductors.join(', ') || 'None'
-                  }\n\nStatus Counts:\n${Object.entries(dbStats.statusCounts)
-                    .map(([status, count]) => `${status}: ${count}`)
-                    .join('\n')}`,
-                  [{ text: t('ok') }]
-                );
-              } catch (error: any) {
-                console.error('Debug error:', error);
-                Alert.alert(t('debug_error'), error.message);
-              }
-            }}
-          >
-            <Text style={styles.debugButtonText}>{t('debug')}</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.statsContainer}>
@@ -365,7 +317,7 @@ export default function ConductorTripsScreen() {
               {networkStatus === 'offline' && (
                 <TouchableOpacity
                   style={styles.retryButton}
-                  onPress={fetchConductorTrips}
+                  onPress={fetchDriverTrips}
                 >
                   <Text style={styles.retryButtonText}>
                     {t('retry_connection')}
@@ -497,7 +449,7 @@ export default function ConductorTripsScreen() {
                             {
                               text: t('go_to_tracking'),
                               onPress: () => {
-                                router.push('/conductor/tracking');
+                                router.push('/driver/tracking');
                               },
                             },
                           ]
@@ -537,7 +489,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 4,
   },
-  conductorName: {
+  driverName: {
     fontSize: 24,
     fontWeight: '700',
     color: '#1F2937',
