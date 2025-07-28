@@ -6,6 +6,8 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Image,
+  ActivityIndicator
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -20,15 +22,24 @@ import {
 } from 'lucide-react-native';
 
 interface Vehicle {
-  id: string;
-  number: string;
-  type: string;
-  status: 'active' | 'maintenance' | 'inactive';
-  location: string;
-  driver?: string;
-  lastMaintenance: Date;
-  fuelLevel: number;
-  mileage: number;
+  vehicle_id: string;
+  license_plate: string;
+  vehicle_type: string;
+  make: string;
+  model: string;
+  year: number;
+  status: string;
+  location?: string;
+  image_url?: string;
+  accidents?: number;
+  km_driven?: number;
+  remaining_fuel?: number;
+  service_date?: string;
+  inspection_date?: string;
+  service_type?: string;
+  manager_username: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function ManagerVehiclesScreen() {
@@ -64,105 +75,123 @@ export default function ManagerVehiclesScreen() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return '#10B981';
+    switch (status?.toLowerCase()) {
+      case 'available':
+        return '#10B981'; // green
+      case 'in_use':
+        return '#3B82F6'; // blue
       case 'maintenance':
-        return '#F59E0B';
+        return '#F59E0B'; // amber
       case 'inactive':
-        return '#6B7280';
       default:
-        return '#6B7280';
+        return '#6B7280'; // gray
     }
   };
 
   const getStatusBgColor = (status: string) => {
-    switch (status) {
-      case 'active':
+    switch (status?.toLowerCase()) {
+      case 'available':
         return '#D1FAE5';
+      case 'in_use':
+        return '#DBEAFE';
       case 'maintenance':
         return '#FEF3C7';
       case 'inactive':
-        return '#F3F4F6';
       default:
         return '#F3F4F6';
     }
   };
 
-  const getFuelLevelColor = (level: number) => {
-    if (level > 50) return '#10B981';
-    if (level > 25) return '#F59E0B';
-    return '#DC2626';
+  const getStatusText = (status: string) => {
+    return status?.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
   };
 
   const renderVehicle = ({ item }: { item: Vehicle }) => (
-    <View style={styles.vehicleCard}>
+    <TouchableOpacity 
+      style={[styles.vehicleCard, { borderLeftWidth: 4, borderLeftColor: getStatusColor(item.status) }]}
+      onPress={() => {
+        // Navigate to vehicle details screen
+        // navigation.navigate('VehicleDetails', { vehicleId: item.vehicle_id });
+      }}
+    >
       <View style={styles.vehicleHeader}>
-        <View style={styles.vehicleInfo}>
-          <Truck size={24} color="#DC2626" />
-          <View style={styles.vehicleDetails}>
-            <Text style={styles.vehicleNumber}>{item.number}</Text>
-            <Text style={styles.vehicleType}>{item.type}</Text>
-          </View>
-        </View>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusBgColor(item.status) },
-          ]}
-        >
-          <Text
+        <View style={styles.vehicleTitle}>
+          <Truck size={20} color="#4B5563" />
+          <Text style={styles.vehicleNumber}>{item.license_plate}</Text>
+          <View 
             style={[
-              styles.statusText,
-              { color: getStatusColor(item.status) },
+              styles.statusBadge, 
+              { 
+                backgroundColor: getStatusBgColor(item.status),
+              }
             ]}
           >
-            {item.status.toUpperCase()}
-          </Text>
+            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+              {getStatusText(item.status)}
+            </Text>
+          </View>
         </View>
+        <Text style={styles.vehicleType}>{item.make} {item.model} ({item.year})</Text>
       </View>
 
-      <View style={styles.vehicleMetrics}>
-        <View style={styles.metricRow}>
-          <MapPin size={16} color="#6B7280" />
-          <Text style={styles.metricText}>{item.location}</Text>
-        </View>
-
-        {item.driver && (
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Driver:</Text>
-            <Text style={styles.metricText}>{item.driver}</Text>
+      <View style={styles.vehicleInfo}>
+        {item.image_url ? (
+          <Image 
+            source={{ uri: item.image_url }} 
+            style={styles.vehicleImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.vehicleImage, styles.vehicleImagePlaceholder]}>
+            <Truck size={32} color="#9CA3AF" />
           </View>
         )}
-
-        <View style={styles.metricRow}>
-          <Clock size={16} color="#6B7280" />
-          <Text style={styles.metricText}>
-            Last Maintenance: {item.lastMaintenance.toLocaleDateString()}
-          </Text>
-        </View>
-
-        <View style={styles.metricRow}>
-          <Fuel size={16} color={getFuelLevelColor(item.fuelLevel)} />
-          <Text style={styles.metricText}>
-            Fuel: {item.fuelLevel}%
-          </Text>
-          <View style={styles.fuelBar}>
-            <View
-              style={[
-                styles.fuelLevel,
-                {
-                  width: `${item.fuelLevel}%`,
-                  backgroundColor: getFuelLevelColor(item.fuelLevel),
-                },
-              ]}
-            />
+        
+        <View style={styles.vehicleDetails}>
+          <View style={styles.detailRow}>
+            <MapPin size={16} color="#6B7280" />
+            <Text style={styles.detailText}>
+              {item.location || 'Location not specified'}
+            </Text>
           </View>
-        </View>
-
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Mileage:</Text>
-          <Text style={styles.metricText}>{item.mileage.toLocaleString()} km</Text>
+          
+          {item.km_driven !== undefined && (
+            <View style={styles.detailRow}>
+              <Settings size={16} color="#6B7280" />
+              <Text style={styles.detailText}>
+                {item.km_driven.toLocaleString()} km driven
+              </Text>
+            </View>
+          )}
+          
+          {item.remaining_fuel !== undefined && (
+            <View style={styles.detailRow}>
+              <Fuel size={16} color="#3B82F6" />
+              <Text style={styles.detailText}>
+                Fuel: {item.remaining_fuel}% remaining
+              </Text>
+            </View>
+          )}
+          
+          {item.service_date && (
+            <View style={styles.detailRow}>
+              <Clock size={16} color="#6B7280" />
+              <Text style={styles.detailText}>
+                Last service: {new Date(item.service_date).toLocaleDateString()}
+              </Text>
+            </View>
+          )}
+          
+          {item.inspection_date && (
+            <View style={styles.detailRow}>
+              <Clock size={16} color="#6B7280" />
+              <Text style={styles.detailText}>
+                Last inspection: {new Date(item.inspection_date).toLocaleDateString()}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -170,22 +199,26 @@ export default function ManagerVehiclesScreen() {
         <Settings size={16} color="#DC2626" />
         <Text style={styles.manageButtonText}>Manage Vehicle</Text>
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
-  if (loading && !refreshing) {
+  if (loading) {
     return (
-      <View style={styles.centered}>
-        <Text>Loading vehicles...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading vehicles...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity onPress={loadVehicles} style={styles.retryButton}>
+        <TouchableOpacity 
+          style={styles.retryButton} 
+          onPress={loadVehicles}
+        >
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -194,59 +227,41 @@ export default function ManagerVehiclesScreen() {
 
   if (!user) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.emptyContainer}>
         <Text>Please log in to view vehicles</Text>
+      </View>
+    );
+  }
+
+  if (vehicles.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Truck size={48} color="#9CA3AF" />
+        <Text style={styles.emptyText}>No vehicles found</Text>
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => {}}
+        >
+          <Text style={styles.addButtonText}>Add Vehicle</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('vehicles') || 'Vehicles'}</Text>
-        <TouchableOpacity style={styles.addButton}>
-          <Plus size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.summary}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>
-            {vehicles.filter(v => v.status === 'active').length}
-          </Text>
-          <Text style={styles.summaryLabel}>Active</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>
-            {vehicles.filter(v => v.status === 'maintenance').length}
-          </Text>
-          <Text style={styles.summaryLabel}>Maintenance</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>
-            {vehicles.filter(v => v.status === 'inactive').length}
-          </Text>
-          <Text style={styles.summaryLabel}>Inactive</Text>
-        </View>
-      </View>
-
       <FlatList
         data={vehicles}
-        keyExtractor={(item) => item.id}
         renderItem={renderVehicle}
+        keyExtractor={(item) => item.vehicle_id.toString()}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            colors={['#3B82F6']}
+          />
         }
         contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Truck size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>
-              {t('no_vehicles') || 'No vehicles found'}
-            </Text>
-          </View>
-        }
       />
     </View>
   );
@@ -256,6 +271,357 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  listContainer: {
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#4B5563',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#F9FAFB',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#F9FAFB',
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#6B7280',
+    marginTop: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 6,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  vehicleCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  vehicleHeader: {
+    marginBottom: 12,
+  },
+  vehicleTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  vehicleNumber: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
+    marginRight: 8,
+    color: '#111827',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  vehicleType: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 28,
+  },
+  vehicleInfo: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  vehicleImage: {
+    width: 100,
+    height: 80,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  vehicleImagePlaceholder: {
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vehicleDetails: {
+    flex: 1,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#4B5563',
+    marginLeft: 6,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    borderRadius: 6,
+    backgroundColor: '#FEF2F2',
+  },
+  manageButtonText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  vehicleCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  vehicleHeader: {
+    marginBottom: 12,
+  },
+  vehicleTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  vehicleNumber: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
+    marginRight: 8,
+    color: '#111827',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  vehicleType: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 28,
+  },
+  vehicleInfo: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  vehicleImage: {
+    width: 100,
+    height: 80,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  vehicleImagePlaceholder: {
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vehicleDetails: {
+    flex: 1,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#4B5563',
+    marginLeft: 6,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    borderRadius: 6,
+    backgroundColor: '#FEF2F2',
+  },
+  manageButtonText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  addButton: {
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  listContainer: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+    padding: 16,
+  },
+  vehicleCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  vehicleHeader: {
+    marginBottom: 12,
+  },
+  vehicleTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  vehicleNumber: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginLeft: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  vehicleType: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  vehicleInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  vehicleImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 16,
+  },
+  vehicleImagePlaceholder: {
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vehicleDetails: {
+    flex: 1,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginLeft: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 16,
+  },
   },
   centered: {
     flex: 1,
