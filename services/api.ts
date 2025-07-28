@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Trip } from '@/types';
 
-const API_BASE_URL = 'http://192.168.0.132:3001/api';
+const API_BASE_URL = 'http://192.168.0.150:3001/api';
 
 // Types
 export interface TripCreateData {
@@ -56,6 +56,25 @@ export interface GPSData {
   speed?: number;
   heading?: number;
   address?: string;
+}
+
+export interface Driver {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  phone: string;
+  license_number: string;
+  license_expiry: string;
+  blood_group: string;
+  address: string;
+  status: 'active' | 'inactive' | 'on_trip';
+  rating: number;
+  total_trips: number;
+  join_date: string;
+  manager_username: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Request Interceptor - adds headers and token
@@ -287,6 +306,47 @@ export const getAllTripsWithDriverInfo = async (): Promise<Trip[]> => {
   return response.data;
 };
 
+// Driver API Functions
+
+/**
+ * Get drivers by manager username
+ */
+export const getDriversByManager = async (managerUsername: string): Promise<Driver[]> => {
+  try {
+    const response = await api(`/drivers/manager/${managerUsername}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching drivers by manager:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get available drivers
+ */
+export const getAvailableDrivers = async (): Promise<Driver[]> => {
+  try {
+    const response = await api('/drivers/available');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching available drivers:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get driver details
+ */
+export const getDriverDetails = async (username: string): Promise<Driver> => {
+  try {
+    const response = await api(`/drivers/username/${username}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching driver details:', error);
+    throw error;
+  }
+};
+
 /**
  * Test API connection
  */
@@ -318,6 +378,12 @@ export const getServerInfo = () => {
     isHttps: API_BASE_URL.startsWith('https'),
     isLocal: API_BASE_URL.includes('192.168.0.132') || API_BASE_URL.includes('localhost'),
   };
+};
+
+// Vehicle API Functions
+
+export const getVehiclesByManager = async (managerUsername: string): Promise<any[]> => {
+  return await api(`/vehicles/manager/${managerUsername}`);
 };
 
 // Export types

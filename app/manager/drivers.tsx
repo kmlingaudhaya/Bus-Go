@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   RefreshControl,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getDriversByManager, Driver } from '@/services/api';
 import {
   User,
   Phone,
@@ -22,21 +25,6 @@ import {
   Edit,
 } from 'lucide-react-native';
 
-interface Driver {
-  id: string;
-  name: string;
-  username: string;
-  phone: string;
-  licenseNumber: string;
-  licenseExpiry: Date;
-  bloodGroup: string;
-  address: string;
-  status: 'active' | 'inactive' | 'on_trip';
-  rating: number;
-  totalTrips: number;
-  joinDate: Date;
-}
-
 export default function ManagerDriversScreen() {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -44,208 +32,134 @@ export default function ManagerDriversScreen() {
   const [filteredDrivers, setFilteredDrivers] = useState<Driver[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock drivers data
-  const mockDrivers: Driver[] = [
-    {
-      id: '1',
-      name: 'Ravi Kumar',
-      username: 'ravi_kumar',
-      phone: '+91 98765 43210',
-      licenseNumber: 'TN-01-20230001',
-      licenseExpiry: new Date('2025-12-31'),
-      bloodGroup: 'O+',
-      address: '123 Anna Nagar, Chennai',
-      status: 'on_trip',
-      rating: 4.8,
-      totalTrips: 245,
-      joinDate: new Date('2022-01-15'),
-    },
-    {
-      id: '2',
-      name: 'Suresh Babu',
-      username: 'suresh_babu',
-      phone: '+91 87654 32109',
-      licenseNumber: 'TN-01-20230002',
-      licenseExpiry: new Date('2024-08-15'),
-      bloodGroup: 'A+',
-      address: '456 T. Nagar, Chennai',
-      status: 'active',
-      rating: 4.6,
-      totalTrips: 189,
-      joinDate: new Date('2022-03-20'),
-    },
-    {
-      id: '3',
-      name: 'Muthu Raja',
-      username: 'muthu_raja',
-      phone: '+91 76543 21098',
-      licenseNumber: 'TN-01-20230003',
-      licenseExpiry: new Date('2026-02-28'),
-      bloodGroup: 'B+',
-      address: '789 Velachery, Chennai',
-      status: 'inactive',
-      rating: 4.4,
-      totalTrips: 156,
-      joinDate: new Date('2022-06-10'),
-    },
-  ];
-
-  useEffect(() => {
-    loadDrivers();
-  }, []);
-
-  useEffect(() => {
-    filterDrivers();
-  }, [searchQuery, drivers]);
-
-  const loadDrivers = () => {
-    // In a real app, this would fetch from an API
-    setDrivers(mockDrivers);
+  const fetchDrivers = async () => {
+    if (!user?.username) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getDriversByManager(user.username);
+      setDrivers(data);
+      setFilteredDrivers(data);
+    } catch (err) {
+      console.error('Error fetching drivers:', err);
+      setError('Failed to load drivers. Please try again.');
+      Alert.alert('Error', 'Failed to load drivers. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const filterDrivers = () => {
-    if (!searchQuery.trim()) {
+  useEffect(() => {
+    fetchDrivers();
+  }, [user?.username]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDrivers();
+  };
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
       setFilteredDrivers(drivers);
     } else {
       const filtered = drivers.filter(
-        driver =>
+        (driver) =>
           driver.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          driver.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          driver.licenseNumber.toLowerCase().includes(searchQuery.toLowerCase())
+          driver.phone.includes(searchQuery) ||
+          driver.license_number.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredDrivers(filtered);
     }
-  };
+  }, [searchQuery, drivers]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    loadDrivers();
-    setRefreshing(false);
-  };
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading drivers...</Text>
+      </View>
+    );
+  }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return '#10B981';
-      case 'on_trip':
-        return '#3B82F6';
-      case 'inactive':
-        return '#6B7280';
-      default:
-        return '#6B7280';
-    }
-  };
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchDrivers}>
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-  const getStatusBgColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return '#D1FAE5';
-      case 'on_trip':
-        return '#DBEAFE';
-      case 'inactive':
-        return '#F3F4F6';
-      default:
-        return '#F3F4F6';
-    }
-  };
+  if (filteredDrivers.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>
+          {searchQuery ? 'No drivers found matching your search' : 'No drivers found'}
+        </Text>
+        {searchQuery && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Text style={styles.clearSearchText}>Clear search</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
 
-  const isLicenseExpiringSoon = (expiryDate: Date) => {
-    const today = new Date();
-    const diffTime = expiryDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 30 && diffDays > 0;
-  };
-
-  const isLicenseExpired = (expiryDate: Date) => {
-    return expiryDate < new Date();
-  };
-
-  const renderDriver = ({ item }: { item: Driver }) => (
+  const renderDriverItem = ({ item }: { item: Driver }) => (
     <View style={styles.driverCard}>
       <View style={styles.driverHeader}>
+        <User size={24} color="#4B5563" />
         <View style={styles.driverInfo}>
-          <View style={styles.avatar}>
-            <User size={24} color="#FFFFFF" />
-          </View>
-          <View style={styles.driverDetails}>
-            <Text style={styles.driverName}>{item.name}</Text>
-            <Text style={styles.driverUsername}>@{item.username}</Text>
-            <View style={styles.ratingContainer}>
-              <Text style={styles.rating}>★ {item.rating}</Text>
-              <Text style={styles.trips}>• {item.totalTrips} trips</Text>
-            </View>
-          </View>
+          <Text style={styles.driverName}>{item.name}</Text>
+          <Text style={styles.driverUsername}>@{item.username}</Text>
         </View>
-        <View style={styles.statusContainer}>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: getStatusBgColor(item.status) },
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-                { color: getStatusColor(item.status) },
-              ]}
-            >
-              {item.status.replace('_', ' ').toUpperCase()}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.editButton}>
-            <Edit size={16} color="#DC2626" />
-          </TouchableOpacity>
+        <View
+          style={[
+            styles.statusBadge,
+            item.status === 'active' && styles.statusActive,
+            item.status === 'inactive' && styles.statusInactive,
+            item.status === 'on_trip' && styles.statusOnTrip,
+          ]}
+        >
+          <Text style={styles.statusText}>
+            {item.status === 'on_trip' ? 'On Trip' : item.status}
+          </Text>
         </View>
       </View>
 
-      <View style={styles.driverMetrics}>
-        <View style={styles.metricRow}>
+      <View style={styles.driverDetails}>
+        <View style={styles.detailRow}>
           <Phone size={16} color="#6B7280" />
-          <Text style={styles.metricText}>{item.phone}</Text>
+          <Text style={styles.detailText}>{item.phone}</Text>
         </View>
-
-        <View style={styles.metricRow}>
+        <View style={styles.detailRow}>
           <CreditCard size={16} color="#6B7280" />
-          <Text style={styles.metricText}>{item.licenseNumber}</Text>
-          {isLicenseExpired(item.licenseExpiry) && (
-            <View style={styles.expiredBadge}>
-              <Text style={styles.expiredText}>EXPIRED</Text>
-            </View>
-          )}
-          {isLicenseExpiringSoon(item.licenseExpiry) && !isLicenseExpired(item.licenseExpiry) && (
-            <View style={styles.warnBadge}>
-              <Text style={styles.warnText}>EXPIRING SOON</Text>
-            </View>
-          )}
+          <Text style={styles.detailText}>{item.license_number}</Text>
         </View>
-
-        <View style={styles.metricRow}>
-          <Calendar size={16} color="#6B7280" />
-          <Text style={styles.metricText}>
-            Expires: {item.licenseExpiry.toLocaleDateString()}
-          </Text>
-        </View>
-
-        <View style={styles.metricRow}>
-          <Heart size={16} color="#DC2626" />
-          <Text style={styles.metricText}>Blood Group: {item.bloodGroup}</Text>
-        </View>
-
-        <View style={styles.metricRow}>
+        <View style={styles.detailRow}>
           <MapPin size={16} color="#6B7280" />
-          <Text style={styles.metricText} numberOfLines={2}>
+          <Text style={styles.detailText} numberOfLines={1} ellipsizeMode="tail">
             {item.address}
           </Text>
         </View>
+      </View>
 
-        <View style={styles.metricRow}>
-          <Calendar size={16} color="#6B7280" />
-          <Text style={styles.metricText}>
-            Joined: {item.joinDate.toLocaleDateString()}
-          </Text>
+      <View style={styles.driverFooter}>
+        <View style={styles.ratingContainer}>
+          <Heart size={16} color="#EF4444" fill="#EF4444" />
+          <Text style={styles.ratingText}>{item.rating?.toFixed(1) || 'N/A'}</Text>
         </View>
+        <Text style={styles.tripsText}>{item.total_trips || 0} trips</Text>
+        <Text style={styles.joinDate}>
+          {item.join_date ? `Joined ${new Date(item.join_date).toLocaleDateString()}` : ''}
+        </Text>
       </View>
     </View>
   );
@@ -253,62 +167,45 @@ export default function ManagerDriversScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t('drivers') || 'Drivers'}</Text>
+        <Text style={styles.headerTitle}>My Drivers</Text>
         <TouchableOpacity style={styles.addButton}>
           <Plus size={20} color="#FFFFFF" />
+          <Text style={styles.addButtonText}>Add Driver</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
-        <View style={styles.searchWrapper}>
-          <Search size={20} color="#6B7280" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t('search_drivers') || 'Search drivers...'}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </View>
-
-      <View style={styles.summary}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>
-            {drivers.filter(d => d.status === 'active').length}
-          </Text>
-          <Text style={styles.summaryLabel}>Active</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>
-            {drivers.filter(d => d.status === 'on_trip').length}
-          </Text>
-          <Text style={styles.summaryLabel}>On Trip</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>
-            {drivers.filter(d => isLicenseExpiringSoon(d.licenseExpiry) || isLicenseExpired(d.licenseExpiry)).length}
-          </Text>
-          <Text style={styles.summaryLabel}>License Issues</Text>
-        </View>
+        <Search size={20} color="#9CA3AF" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by name, phone, or license..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9CA3AF"
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+            <Text style={styles.clearButtonText}>×</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <FlatList
         data={filteredDrivers}
+        renderItem={renderDriverItem}
         keyExtractor={(item) => item.id}
-        renderItem={renderDriver}
+        contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            colors={['#3B82F6']}
+            tintColor="#3B82F6"
+          />
         }
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <User size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>
-              {searchQuery
-                ? t('no_drivers_found') || 'No drivers found'
-                : t('no_drivers') || 'No drivers available'}
-            </Text>
+          <View style={styles.emptyListContainer}>
+            <Text style={styles.emptyListText}>No drivers found</Text>
           </View>
         }
       />
@@ -319,74 +216,131 @@ export default function ManagerDriversScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    alignItems: 'center',
+    padding: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  title: {
+  headerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#111827',
   },
   addButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#6B7280',
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#FFFFFF',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#FFFFFF',
+  },
+  emptyText: {
+    color: '#6B7280',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  clearSearchText: {
+    color: '#3B82F6',
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 8,
   },
   searchContainer: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
     borderRadius: 12,
+    margin: 16,
+    marginTop: 8,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
+    height: '100%',
+    paddingLeft: 8,
+    color: '#111827',
     fontSize: 16,
-    color: '#1F2937',
-    marginLeft: 12,
+    paddingRight: 8,
   },
-  summary: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    marginBottom: 8,
+  clearButton: {
+    padding: 4,
   },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
+  clearButtonText: {
+    fontSize: 20,
+    color: '#9CA3AF',
+    lineHeight: 20,
   },
-  summaryValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#DC2626',
-    marginBottom: 4,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  listContainer: {
+  listContent: {
     padding: 16,
+    paddingTop: 0,
+  },
+  emptyListContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyListText: {
+    color: '#6B7280',
+    fontSize: 16,
+    textAlign: 'center',
   },
   driverCard: {
     backgroundColor: '#FFFFFF',
@@ -408,23 +362,12 @@ const styles = StyleSheet.create({
   driverInfo: {
     flexDirection: 'row',
     flex: 1,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#DC2626',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  driverDetails: {
-    flex: 1,
+    marginLeft: 12,
   },
   driverName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#111827',
     marginBottom: 2,
   },
   driverUsername: {
@@ -432,35 +375,76 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 4,
   },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rating: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F59E0B',
-  },
-  trips: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 4,
-  },
   statusContainer: {
     alignItems: 'flex-end',
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 'auto',
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  statusActive: {
+    backgroundColor: '#34C759',
+    padding: 8,
+  },
+  statusInactive: {
+    backgroundColor: '#FEE2E2',
+  },
+  statusOnTrip: {
+    backgroundColor: '#DBEAFE',
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+    textTransform: 'capitalize',
   },
-  editButton: {
-    padding: 8,
+  driverDetails: {
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 12,
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  detailText: {
+    marginLeft: 8,
+    color: '#4B5563',
+    fontSize: 14,
+    flex: 1,
+  },
+  driverFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 12,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  ratingText: {
+    marginLeft: 4,
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  emptySearchText: {
+    color: '#6B7280',
+    fontSize: 16,
+    textAlign: 'center',
   },
   driverMetrics: {
     marginTop: 8,
@@ -498,15 +482,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F59E0B',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
+  tripsText: {
+    fontSize: 14,
+    color: '#6B7280',
   },
-  emptyText: {
-    fontSize: 16,
+  joinDate: {
+    fontSize: 12,
     color: '#9CA3AF',
-    marginTop: 16,
   },
 });

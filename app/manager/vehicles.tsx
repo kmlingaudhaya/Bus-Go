@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getVehiclesByManager } from '@/services/api';
 import {
   Truck,
   MapPin,
@@ -35,67 +36,31 @@ export default function ManagerVehiclesScreen() {
   const { t } = useLanguage();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Mock vehicles data
-  const mockVehicles: Vehicle[] = [
-    {
-      id: '1',
-      number: 'TN-01-AB-1234',
-      type: 'Bus',
-      status: 'active',
-      location: 'Chennai Central',
-      driver: 'Ravi Kumar',
-      lastMaintenance: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15), // 15 days ago
-      fuelLevel: 75,
-      mileage: 45000,
-    },
-    {
-      id: '2',
-      number: 'TN-01-CD-5678',
-      type: 'Bus',
-      status: 'maintenance',
-      location: 'Depot A',
-      lastMaintenance: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
-      fuelLevel: 20,
-      mileage: 52000,
-    },
-    {
-      id: '3',
-      number: 'TN-01-EF-9012',
-      type: 'Bus',
-      status: 'active',
-      location: 'Coimbatore',
-      driver: 'Suresh Babu',
-      lastMaintenance: new Date(Date.now() - 1000 * 60 * 60 * 24 * 8), // 8 days ago
-      fuelLevel: 90,
-      mileage: 38000,
-    },
-    {
-      id: '4',
-      number: 'TN-01-GH-3456',
-      type: 'Bus',
-      status: 'inactive',
-      location: 'Depot B',
-      lastMaintenance: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // 30 days ago
-      fuelLevel: 10,
-      mileage: 65000,
-    },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadVehicles();
-  }, []);
+  }, [user?.username]);
 
-  const loadVehicles = () => {
-    // In a real app, this would fetch from an API
-    setVehicles(mockVehicles);
+  const loadVehicles = async () => {
+    if (!user?.username) return;
+
+    try {
+      setLoading(true);
+      const data = await getVehiclesByManager(user.username);
+      setVehicles(data);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch vehicles:', err);
+      setError('Failed to load vehicles. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    loadVehicles();
-    setRefreshing(false);
+    await loadVehicles();
   };
 
   const getStatusColor = (status: string) => {
@@ -208,6 +173,33 @@ export default function ManagerVehiclesScreen() {
     </View>
   );
 
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.centered}>
+        <Text>Loading vehicles...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={loadVehicles} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.centered}>
+        <Text>Please log in to view vehicles</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -264,6 +256,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#2563EB',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   header: {
     flexDirection: 'row',
