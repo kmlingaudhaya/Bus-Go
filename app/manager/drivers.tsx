@@ -9,10 +9,18 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getDriversByManager, Driver } from '@/services/api';
+import {
+  getDriversByManager,
+  createDriver,
+  updateDriver,
+  deleteDriver,
+  Driver,
+} from '@/services/api';
 import {
   User,
   Phone,
@@ -23,6 +31,8 @@ import {
   Search,
   Plus,
   Edit,
+  Trash2,
+  X,
 } from 'lucide-react-native';
 
 export default function ManagerDriversScreen() {
@@ -34,14 +44,31 @@ export default function ManagerDriversScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    password: '',
+    phone_number: '',
+    license_number: '',
+    license_class: '',
+    date_of_birth: '',
+    insurance_policy_number: '',
+    address: '',
+  });
 
-  const fetchDrivers = async () => {
+    const fetchDrivers = async () => {
     if (!user?.username) return;
     
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching drivers for manager:', user.username);
       const data = await getDriversByManager(user.username);
+      console.log('Drivers data received:', data);
       setDrivers(data);
       setFilteredDrivers(data);
     } catch (err) {
@@ -71,11 +98,111 @@ export default function ManagerDriversScreen() {
         (driver) =>
           driver.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           driver.phone.includes(searchQuery) ||
-          driver.license_number.toLowerCase().includes(searchQuery.toLowerCase())
+          driver.license_number
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
       );
       setFilteredDrivers(filtered);
     }
   }, [searchQuery, drivers]);
+
+  const handleAddDriver = async () => {
+    try {
+      const driverData = {
+        ...formData,
+        manager_id: user?.id, // Assuming user.id is the manager_id
+      };
+
+      await createDriver(driverData);
+      setShowAddModal(false);
+      resetForm();
+      fetchDrivers();
+      Alert.alert('Success', 'Driver added successfully!');
+    } catch (err) {
+      console.error('Failed to add driver:', err);
+      Alert.alert('Error', 'Failed to add driver. Please try again.');
+    }
+  };
+
+  const handleEditDriver = async () => {
+    if (!selectedDriver) return;
+
+    try {
+      const driverData = {
+        ...formData,
+        driver_id: selectedDriver.id,
+      };
+
+      await updateDriver(parseInt(selectedDriver.id), driverData);
+      setShowEditModal(false);
+      setSelectedDriver(null);
+      resetForm();
+      fetchDrivers();
+      Alert.alert('Success', 'Driver updated successfully!');
+    } catch (err) {
+      console.error('Failed to update driver:', err);
+      Alert.alert('Error', 'Failed to update driver. Please try again.');
+    }
+  };
+
+  const handleDeleteDriver = async (driver: Driver) => {
+    Alert.alert(
+      'Delete Driver',
+      `Are you sure you want to delete ${driver.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDriver(parseInt(driver.id));
+              fetchDrivers();
+              Alert.alert('Success', 'Driver deleted successfully!');
+            } catch (err) {
+              console.error('Failed to delete driver:', err);
+              Alert.alert(
+                'Error',
+                'Failed to delete driver. Please try again.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const resetForm = () => {
+    setFormData({
+      first_name: '',
+      last_name: '',
+      email: '',
+      password: '',
+      phone_number: '',
+      license_number: '',
+      license_class: '',
+      date_of_birth: '',
+      insurance_policy_number: '',
+      address: '',
+    });
+  };
+
+  const openEditModal = (driver: Driver) => {
+    setSelectedDriver(driver);
+    setFormData({
+      first_name: driver.name.split(' ')[0] || '',
+      last_name: driver.name.split(' ').slice(1).join(' ') || '',
+      email: driver.email,
+      password: '', // Don't populate password for security
+      phone_number: driver.phone,
+      license_number: driver.license_number,
+      license_class: driver.license_expiry || '',
+      date_of_birth: '',
+      insurance_policy_number: '',
+      address: driver.address,
+    });
+    setShowEditModal(true);
+  };
 
   if (loading && !refreshing) {
     return (
@@ -101,7 +228,9 @@ export default function ManagerDriversScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {searchQuery ? 'No drivers found matching your search' : 'No drivers found'}
+          {searchQuery
+            ? 'No drivers found matching your search'
+            : 'No drivers found'}
         </Text>
         {searchQuery && (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -145,7 +274,11 @@ export default function ManagerDriversScreen() {
         </View>
         <View style={styles.detailRow}>
           <MapPin size={16} color="#6B7280" />
-          <Text style={styles.detailText} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            style={styles.detailText}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {item.address}
           </Text>
         </View>
@@ -154,12 +287,34 @@ export default function ManagerDriversScreen() {
       <View style={styles.driverFooter}>
         <View style={styles.ratingContainer}>
           <Heart size={16} color="#EF4444" fill="#EF4444" />
-          <Text style={styles.ratingText}>{item.rating?.toFixed(1) || 'N/A'}</Text>
+          <Text style={styles.ratingText}>
+            {item.rating?.toFixed(1) || 'N/A'}
+          </Text>
         </View>
         <Text style={styles.tripsText}>{item.total_trips || 0} trips</Text>
         <Text style={styles.joinDate}>
-          {item.join_date ? `Joined ${new Date(item.join_date).toLocaleDateString()}` : ''}
+          {item.join_date
+            ? `Joined ${new Date(item.join_date).toLocaleDateString()}`
+            : ''}
         </Text>
+      </View>
+
+      <View style={styles.actionButtons}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.editButton]}
+          onPress={() => openEditModal(item)}
+        >
+          <Edit size={16} color="#3B82F6" />
+          <Text style={[styles.actionButtonText, styles.editButtonText]}>Edit</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => handleDeleteDriver(item)}
+        >
+          <Trash2 size={16} color="#DC2626" />
+          <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -168,10 +323,6 @@ export default function ManagerDriversScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Drivers</Text>
-        <TouchableOpacity style={styles.addButton}>
-          <Plus size={20} color="#FFFFFF" />
-          <Text style={styles.addButtonText}>Add Driver</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
@@ -184,7 +335,10 @@ export default function ManagerDriversScreen() {
           placeholderTextColor="#9CA3AF"
         />
         {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+          <TouchableOpacity
+            onPress={() => setSearchQuery('')}
+            style={styles.clearButton}
+          >
             <Text style={styles.clearButtonText}>×</Text>
           </TouchableOpacity>
         ) : null}
@@ -196,9 +350,9 @@ export default function ManagerDriversScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh} 
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
             colors={['#3B82F6']}
             tintColor="#3B82F6"
           />
@@ -209,6 +363,223 @@ export default function ManagerDriversScreen() {
           </View>
         }
       />
+
+      {/* Floating Action Button */}
+      <TouchableOpacity 
+        style={styles.fab}
+        onPress={() => setShowAddModal(true)}
+      >
+        <Plus size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Add Driver Modal */}
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add New Driver</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalBody}>
+              <TextInput
+                style={styles.input}
+                placeholder="First Name"
+                value={formData.first_name}
+                onChangeText={(text) => setFormData({...formData, first_name: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Last Name"
+                value={formData.last_name}
+                onChangeText={(text) => setFormData({...formData, last_name: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                value={formData.email}
+                onChangeText={(text) => setFormData({...formData, email: text})}
+                keyboardType="email-address"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                value={formData.password}
+                onChangeText={(text) => setFormData({...formData, password: text})}
+                secureTextEntry
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number"
+                value={formData.phone_number}
+                onChangeText={(text) => setFormData({...formData, phone_number: text})}
+                keyboardType="phone-pad"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="License Number"
+                value={formData.license_number}
+                onChangeText={(text) => setFormData({...formData, license_number: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="License Class"
+                value={formData.license_class}
+                onChangeText={(text) => setFormData({...formData, license_class: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Date of Birth (YYYY-MM-DD)"
+                value={formData.date_of_birth}
+                onChangeText={(text) => setFormData({...formData, date_of_birth: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Insurance Policy Number"
+                value={formData.insurance_policy_number}
+                onChangeText={(text) => setFormData({...formData, insurance_policy_number: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Address"
+                value={formData.address}
+                onChangeText={(text) => setFormData({...formData, address: text})}
+                multiline
+              />
+            </ScrollView>
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowAddModal(false);
+                  resetForm();
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleAddDriver}
+              >
+                <Text style={styles.saveButtonText}>Add Driver</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Driver Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Driver</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalBody}>
+              <TextInput
+                style={styles.input}
+                placeholder="First Name"
+                value={formData.first_name}
+                onChangeText={(text) => setFormData({...formData, first_name: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Last Name"
+                value={formData.last_name}
+                onChangeText={(text) => setFormData({...formData, last_name: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                value={formData.email}
+                onChangeText={(text) => setFormData({...formData, email: text})}
+                keyboardType="email-address"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Password (leave blank to keep current)"
+                value={formData.password}
+                onChangeText={(text) => setFormData({...formData, password: text})}
+                secureTextEntry
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number"
+                value={formData.phone_number}
+                onChangeText={(text) => setFormData({...formData, phone_number: text})}
+                keyboardType="phone-pad"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="License Number"
+                value={formData.license_number}
+                onChangeText={(text) => setFormData({...formData, license_number: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="License Class"
+                value={formData.license_class}
+                onChangeText={(text) => setFormData({...formData, license_class: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Date of Birth (YYYY-MM-DD)"
+                value={formData.date_of_birth}
+                onChangeText={(text) => setFormData({...formData, date_of_birth: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Insurance Policy Number"
+                value={formData.insurance_policy_number}
+                onChangeText={(text) => setFormData({...formData, insurance_policy_number: text})}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Address"
+                value={formData.address}
+                onChangeText={(text) => setFormData({...formData, address: text})}
+                multiline
+              />
+            </ScrollView>
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowEditModal(false);
+                  setSelectedDriver(null);
+                  resetForm();
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleEditDriver}
+              >
+                <Text style={styles.saveButtonText}>Update Driver</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -489,5 +860,124 @@ const styles = StyleSheet.create({
   joinDate: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  editButton: {
+    backgroundColor: '#EBF8FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  deleteButton: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  editButtonText: {
+    color: '#3B82F6',
+  },
+  deleteButtonText: {
+    color: '#DC2626',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    width: '90%',
+    maxHeight: '80%',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  modalBody: {
+    maxHeight: 400,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  saveButton: {
+    backgroundColor: '#3B82F6',
+  },
+  cancelButtonText: {
+    color: '#6B7280',
+    textAlign: 'center',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    textAlign: 'center',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
