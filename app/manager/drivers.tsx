@@ -34,6 +34,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react-native';
+import Navbar from '@/components/Navbar';
 
 export default function ManagerDriversScreen() {
   const { user } = useAuth();
@@ -317,10 +318,7 @@ export default function ManagerDriversScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Drivers</Text>
-      </View>
-
+      <Navbar title="Drivers Management" />
       <View style={styles.searchContainer}>
         <Search size={20} color="#9CA3AF" style={styles.searchIcon} />
         <TextInput
@@ -626,20 +624,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
+    paddingTop: 0,
   },
   addButton: {
     flexDirection: 'row',
@@ -713,7 +698,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 12,
     margin: 16,
-    marginTop: 8,
+    marginTop: 16,
     paddingHorizontal: 16,
     height: 48,
   },

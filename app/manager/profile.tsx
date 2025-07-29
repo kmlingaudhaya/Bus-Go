@@ -22,6 +22,7 @@ import {
   LogOut,
   Shield,
 } from 'lucide-react-native';
+import Navbar from '@/components/Navbar';
 
 export default function ManagerProfileScreen() {
   const { user, logout } = useAuth();
@@ -64,8 +65,10 @@ export default function ManagerProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <Navbar title="Profile" />
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.header}>
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <User size={40} color="#FFFFFF" />
@@ -217,7 +220,8 @@ export default function ManagerProfileScreen() {
           {t('member_since') || 'Member since'} {new Date(user?.created_at || '').toLocaleDateString()}
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -225,6 +229,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+    paddingTop: 0,
+  },
+  scrollContainer: {
+    flex: 1,
   },
   header: {
     backgroundColor: '#FFFFFF',
@@ -232,6 +240,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     paddingHorizontal: 20,
     marginBottom: 8,
+    paddingTop: 16,
   },
   avatarContainer: {
     position: 'relative',

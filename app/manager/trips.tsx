@@ -22,6 +22,7 @@ import {
   ArrowRight,
   Calendar,
 } from 'lucide-react-native';
+import Navbar from '@/components/Navbar';
 
 type TripStatus = 'all' | 'scheduled' | 'in_progress' | 'completed';
 
@@ -280,8 +281,8 @@ export default function ManagerTripsScreen() {
 
   return (
     <View style={styles.container}>
+      <Navbar title="Trip Management" />
       <View style={styles.headerContainer}>
-        <Text style={styles.title}>Trip Management</Text>
         <Text style={styles.subtitle}>
           Monitor and manage all trips under your supervision
         </Text>
@@ -338,11 +339,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    paddingTop: 0,
   },
   headerContainer: {
     backgroundColor: '#FFFFFF',
     padding: 20,
-    paddingTop: 40,
+    paddingTop: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },

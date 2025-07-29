@@ -34,6 +34,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
+import Navbar from '@/components/Navbar';
 
 export default function ManagerVehiclesScreen() {
   const { user } = useAuth();
@@ -407,6 +408,7 @@ export default function ManagerVehiclesScreen() {
 
   return (
     <View style={styles.container}>
+      <Navbar title="Vehicles Management" />
       <FlatList
         data={filteredVehicles}
         renderItem={renderVehicle}
@@ -735,10 +737,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+    paddingTop: 0,
   },
   listContainer: {
     padding: 16,
     paddingBottom: 24,
+    paddingTop: 16,
   },
   loadingContainer: {
     flex: 1,

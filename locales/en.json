@@ -98,6 +98,8 @@
   "offline_status": "🔴 Offline",
   "checking_status": "🟡 Checking...",
   "debug_info": "Debug Info",
+  "startrit": "Startrit",
+  "smart_transportation": "Smart Transportation",
   "debug_error": "Debug Error",
   "debug": "Debug",
   "ok": "OK",

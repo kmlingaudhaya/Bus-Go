@@ -21,6 +21,7 @@ import {
   LogOut,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import Navbar from '@/components/Navbar';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -111,160 +112,165 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarText}>
-            {user?.firstname?.charAt(0)?.toUpperCase() ||
-              user?.username?.charAt(0)?.toUpperCase() ||
-              'U'}
+    <View style={styles.container}>
+      <Navbar title="Profile" />
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.header}>
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>
+              {user?.firstname?.charAt(0)?.toUpperCase() ||
+                user?.username?.charAt(0)?.toUpperCase() ||
+                'U'}
+            </Text>
+          </View>
+          <Text style={styles.userName}>
+            {user?.firstname || user?.username}
           </Text>
-        </View>
-        <Text style={styles.userName}>{user?.firstname || user?.username}</Text>
-        <View
-          style={[
-            styles.roleBadge,
-            { backgroundColor: getRoleBackground(user?.role || 'user') },
-          ]}
-        >
-          <Text
+          <View
             style={[
-              styles.roleText,
-              { color: getRoleColor(user?.role || 'user') },
+              styles.roleBadge,
+              { backgroundColor: getRoleBackground(user?.role || 'user') },
             ]}
-          >
-            {getRoleLabel(user?.role || 'user')}
-          </Text>
-        </View>
-      </View>
-
-      {/* Language Switcher */}
-      <View style={styles.languageSwitcher}>
-        {languages.map((lang) => (
-          <TouchableOpacity
-            key={lang.code}
-            style={[
-              styles.langButton,
-              currentLang === lang.code && styles.langButtonActive,
-            ]}
-            onPress={() => handleChangeLanguage(lang.code)}
-            disabled={currentLang === lang.code}
           >
             <Text
               style={[
-                styles.langButtonText,
-                currentLang === lang.code && styles.langButtonTextActive,
+                styles.roleText,
+                { color: getRoleColor(user?.role || 'user') },
               ]}
             >
-              {lang.label}
+              {getRoleLabel(user?.role || 'user')}
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.infoSection}>
-        <View style={styles.infoRow}>
-          <UserIcon size={20} color="#64748B" />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>{t('username')}</Text>
-            <Text style={styles.infoValue}>{user?.username}</Text>
           </View>
         </View>
-        <View style={styles.infoRow}>
-          <Mail size={20} color="#64748B" />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>{t('email')}</Text>
-            <Text style={styles.infoValue}>{user?.email}</Text>
-          </View>
+
+        {/* Language Switcher */}
+        <View style={styles.languageSwitcher}>
+          {languages.map((lang) => (
+            <TouchableOpacity
+              key={lang.code}
+              style={[
+                styles.langButton,
+                currentLang === lang.code && styles.langButtonActive,
+              ]}
+              onPress={() => handleChangeLanguage(lang.code)}
+              disabled={currentLang === lang.code}
+            >
+              <Text
+                style={[
+                  styles.langButtonText,
+                  currentLang === lang.code && styles.langButtonTextActive,
+                ]}
+              >
+                {lang.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-        {user?.firstname && (
-          <View style={styles.infoRow}>
-            <UserIcon size={20} color="#64748B" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('first_name')}</Text>
-              <Text style={styles.infoValue}>{user.firstname}</Text>
-            </View>
-          </View>
-        )}
-        {user?.lastname && (
-          <View style={styles.infoRow}>
-            <UserIcon size={20} color="#64748B" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('last_name')}</Text>
-              <Text style={styles.infoValue}>{user.lastname}</Text>
-            </View>
-          </View>
-        )}
-        {user?.dof && (
-          <View style={styles.infoRow}>
-            <UserIcon size={20} color="#64748B" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('date_of_birth')}</Text>
-              <Text style={styles.infoValue}>{user.dof}</Text>
-            </View>
-          </View>
-        )}
-        {user?.created_at && (
-          <View style={styles.infoRow}>
-            <UserIcon size={20} color="#64748B" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('member_since')}</Text>
-              <Text style={styles.infoValue}>
-                {new Date(user.created_at).toLocaleDateString('en-IN')}
-              </Text>
-            </View>
-          </View>
-        )}
-        {/* Role-based extra info example */}
-        {user?.role === 'driver' && (
-          <View style={styles.infoRow}>
-            <UserIcon size={20} color="#64748B" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('driver_info')}</Text>
-              <Text style={styles.infoValue}>
-                {t('special_info_driver')}
-              </Text>
-            </View>
-          </View>
-        )}
-        {user?.role === 'manager' && (
-          <View style={styles.infoRow}>
-            <UserIcon size={20} color="#64748B" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('manager_info')}</Text>
-              <Text style={styles.infoValue}>{t('special_info_manager')}</Text>
-            </View>
-          </View>
-        )}
-      </View>
 
-      <View style={styles.menuSection}>
-        {menuItems.map((item, index) => (
-          <TouchableOpacity key={index} style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <View style={styles.menuIcon}>
-                <item.icon size={20} color="#64748B" />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+        <View style={styles.infoSection}>
+          <View style={styles.infoRow}>
+            <UserIcon size={20} color="#64748B" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>{t('username')}</Text>
+              <Text style={styles.infoValue}>{user?.username}</Text>
+            </View>
+          </View>
+          <View style={styles.infoRow}>
+            <Mail size={20} color="#64748B" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>{t('email')}</Text>
+              <Text style={styles.infoValue}>{user?.email}</Text>
+            </View>
+          </View>
+          {user?.firstname && (
+            <View style={styles.infoRow}>
+              <UserIcon size={20} color="#64748B" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>{t('first_name')}</Text>
+                <Text style={styles.infoValue}>{user.firstname}</Text>
               </View>
             </View>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          )}
+          {user?.lastname && (
+            <View style={styles.infoRow}>
+              <UserIcon size={20} color="#64748B" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>{t('last_name')}</Text>
+                <Text style={styles.infoValue}>{user.lastname}</Text>
+              </View>
+            </View>
+          )}
+          {user?.dof && (
+            <View style={styles.infoRow}>
+              <UserIcon size={20} color="#64748B" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>{t('date_of_birth')}</Text>
+                <Text style={styles.infoValue}>{user.dof}</Text>
+              </View>
+            </View>
+          )}
+          {user?.created_at && (
+            <View style={styles.infoRow}>
+              <UserIcon size={20} color="#64748B" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>{t('member_since')}</Text>
+                <Text style={styles.infoValue}>
+                  {new Date(user.created_at).toLocaleDateString('en-IN')}
+                </Text>
+              </View>
+            </View>
+          )}
+          {/* Role-based extra info example */}
+          {user?.role === 'driver' && (
+            <View style={styles.infoRow}>
+              <UserIcon size={20} color="#64748B" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>{t('driver_info')}</Text>
+                <Text style={styles.infoValue}>{t('special_info_driver')}</Text>
+              </View>
+            </View>
+          )}
+          {user?.role === 'manager' && (
+            <View style={styles.infoRow}>
+              <UserIcon size={20} color="#64748B" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>{t('manager_info')}</Text>
+                <Text style={styles.infoValue}>
+                  {t('special_info_manager')}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <LogOut size={20} color="#DC2626" />
-        <Text style={styles.logoutText}>{t('logout')}</Text>
-      </TouchableOpacity>
+        <View style={styles.menuSection}>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity key={index} style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <View style={styles.menuIcon}>
+                  <item.icon size={20} color="#64748B" />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+              </View>
+              <Text style={styles.menuArrow}>›</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>{t('app_version')}</Text>
-        <Text style={styles.footerSubtext}>{t('made_with_love')}</Text>
-      </View>
-    </ScrollView>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <LogOut size={20} color="#DC2626" />
+          <Text style={styles.logoutText}>{t('logout')}</Text>
+        </TouchableOpacity>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>{t('app_version')}</Text>
+          <Text style={styles.footerSubtext}>{t('made_with_love')}</Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -272,6 +278,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    paddingTop: 0,
+  },
+  scrollContainer: {
+    flex: 1,
   },
   header: {
     alignItems: 'center',

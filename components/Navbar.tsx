@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { router } from 'expo-router';
@@ -75,7 +76,7 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
         return [
           {
             icon: Bus,
-            label: t('search_buses') ,
+            label: t('search_buses'),
             route: '/(tabs)',
           },
           {
@@ -162,7 +163,14 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
           <Menu size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleContainer}>
+          <Image
+            source={require('@/assets/images/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>{title}</Text>
+        </View>
 
         <TouchableOpacity
           style={styles.notificationButton}
@@ -252,11 +260,10 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
 
             <View style={styles.menuFooter}>
               <Text style={styles.footerText}>
-                {t('tamil_nadu_state_transport') ||
-                  'Tamil Nadu State Transport'}
+                {t('startrit') || 'Startrit'}
               </Text>
               <Text style={styles.footerSubtext}>
-                {t('government_of_tamil_nadu') || 'Government of Tamil Nadu'}
+                {t('smart_transportation') || 'Smart Transportation'}
               </Text>
             </View>
           </View>
@@ -306,11 +313,21 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: 8,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  logo: {
+    width: 30,
+    height: 30,
+    marginRight: 8,
+  },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
-    flex: 1,
     textAlign: 'center',
   },
   notificationButton: {

@@ -17,6 +17,7 @@ import {
   Star,
   Users,
 } from 'lucide-react-native';
+import Navbar from '@/components/Navbar';
 
 interface LeaderboardEntry {
   id: string;
@@ -193,8 +194,9 @@ export default function ManagerLeaderboardScreen() {
 
   return (
     <View style={styles.container}>
+      <Navbar title="Leaderboard" />
       <View style={styles.header}>
-        <Text style={styles.title}>{t('leaderboard') || 'Leaderboard'}</Text>
+        <Text style={styles.subtitle}>{t('leaderboard') || 'Leaderboard'}</Text>
       </View>
 
       <View style={styles.periodSelector}>
@@ -265,17 +267,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+    paddingTop: 0,
   },
   header: {
     padding: 20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    paddingTop: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
+  subtitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280',
     textAlign: 'center',
   },
   periodSelector: {

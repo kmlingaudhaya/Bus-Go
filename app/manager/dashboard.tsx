@@ -20,6 +20,10 @@ import {
   TrendingUp,
   Clock,
   CircleAlert as AlertCircle,
+  Car,
+  UserCheck,
+  DollarSign,
+  Activity,
 } from 'lucide-react-native';
 
 export default function StaffDashboardScreen() {
@@ -31,26 +35,26 @@ export default function StaffDashboardScreen() {
 
   const stats = [
     {
-      icon: Bus,
-      label: t('active_buses'),
+      icon: Car,
+      label: 'Active Vehicles',
       value: '45',
       color: '#DC2626',
     },
     {
-      icon: Users,
-      label: t('waiting_list'),
+      icon: UserCheck,
+      label: 'Available Drivers',
       value: '23',
       color: '#F59E0B',
     },
     {
-      icon: Ticket,
-      label: t('todays_bookings'),
-      value: '287',
+      icon: Activity,
+      label: 'Active Trips',
+      value: '12',
       color: '#10B981',
     },
     {
-      icon: TrendingUp,
-      label: t('revenue'),
+      icon: DollarSign,
+      label: "Today's Revenue",
       value: '₹1.2L',
       color: '#3B82F6',
     },
@@ -58,28 +62,44 @@ export default function StaffDashboardScreen() {
 
   const quickActions = [
     {
-      icon: Bus,
-      title: t('add_new_bus'),
-      subtitle: t('schedule_new_route'),
-      route: '/staff/buses',
+      icon: Car,
+      title: 'Vehicles Management',
+      subtitle: 'Manage fleet, add/edit vehicles',
+      route: '/manager/vehicles',
+      description:
+        'Add new vehicles, track maintenance, monitor fuel levels, and manage your entire fleet.',
     },
     {
-      icon: Ticket,
-      title: t('offline_booking'),
-      subtitle: t('manual_ticket_booking'),
-      route: '/staff/booking',
+      icon: UserCheck,
+      title: 'Drivers Management',
+      subtitle: 'Manage drivers and their profiles',
+      route: '/manager/drivers',
+      description:
+        'Add new drivers, update profiles, track performance, and manage driver assignments.',
+    },
+    {
+      icon: Activity,
+      title: 'Trip Management',
+      subtitle: 'Monitor and manage all trips',
+      route: '/manager/trips',
+      description:
+        'Track active trips, view completed journeys, monitor driver performance, and manage schedules.',
+    },
+    {
+      icon: TrendingUp,
+      title: 'Leaderboard',
+      subtitle: 'View performance rankings',
+      route: '/manager/leaderboard',
+      description:
+        'See top-performing drivers, track metrics, and recognize achievements across your team.',
     },
     {
       icon: Users,
-      title: t('manage_waitlist'),
-      subtitle: t('process_waiting_passengers'),
-      route: '/staff/waitlist',
-    },
-    {
-      icon: MapPin,
-      title: t('track_buses'),
-      subtitle: t('monitor_live_locations'),
-      route: '/staff/tracking',
+      title: 'Profile',
+      subtitle: 'Manage your account settings',
+      route: '/manager/profile',
+      description:
+        'Update your profile information, change settings, and manage your account preferences.',
     },
   ];
 
@@ -110,11 +130,8 @@ export default function StaffDashboardScreen() {
       />
       <ScrollView style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.greeting}>{t('welcome_back')}</Text>
+          <Text style={styles.greeting}>Welcome back Manager</Text>
           <Text style={styles.staffName}>{user?.username}</Text>
-          <Text style={styles.employeeId}>
-            {t('employee_id', { id: user?.user_id })}
-          </Text>
         </View>
 
         {/* Statistics */}
@@ -122,7 +139,10 @@ export default function StaffDashboardScreen() {
           {stats.map((stat, index) => (
             <View key={index} style={styles.statCard}>
               <stat.icon size={24} color={stat.color} />
-              <Text style={[styles.statValue, { color: stat.color }]}> {stat.value} </Text>
+              <Text style={[styles.statValue, { color: stat.color }]}>
+                {' '}
+                {stat.value}{' '}
+              </Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
           ))}
@@ -130,7 +150,10 @@ export default function StaffDashboardScreen() {
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('quick_actions')}</Text>
+          <Text style={styles.sectionTitle}>Quick Access</Text>
+          <Text style={styles.sectionSubtitle}>
+            Tap to navigate to any page
+          </Text>
           <View style={styles.actionGrid}>
             {quickActions.map((action, index) => (
               <TouchableOpacity
@@ -138,9 +161,16 @@ export default function StaffDashboardScreen() {
                 style={styles.actionCard}
                 onPress={() => router.push(action.route as any)}
               >
-                <action.icon size={24} color="#DC2626" />
-                <Text style={styles.actionTitle}>{action.title}</Text>
-                <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
+                <View style={styles.actionHeader}>
+                  <action.icon size={24} color="#DC2626" />
+                  <View style={styles.actionTextContainer}>
+                    <Text style={styles.actionTitle}>{action.title}</Text>
+                    <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
+                  </View>
+                </View>
+                <Text style={styles.actionDescription}>
+                  {action.description}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -196,7 +226,9 @@ export default function StaffDashboardScreen() {
               <Text style={styles.metricValue}>4.2/5.0</Text>
             </View>
             <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>{t('customer_satisfaction')}</Text>
+              <Text style={styles.metricLabel}>
+                {t('customer_satisfaction')}
+              </Text>
               <Text style={styles.metricValue}>87%</Text>
             </View>
             <View style={styles.metricRow}>
@@ -277,6 +309,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#DC2626', // changed from blue
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
     marginBottom: 16,
   },
   actionGrid: {
@@ -285,25 +322,53 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   actionCard: {
-    width: '48%',
+    width: '100%',
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+  },
+  actionHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  actionTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  actionDescription: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 16,
+    marginTop: 8,
   },
   actionTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginTop: 8,
-    marginBottom: 4,
-    textAlign: 'center',
+    marginBottom: 2,
   },
   actionSubtitle: {
     fontSize: 12,
     color: '#6B7280',
-    textAlign: 'center',
+  },
+  overviewContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+  },
+  overviewTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  overviewText: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+    marginBottom: 4,
   },
   overviewCard: {
     backgroundColor: '#F9FAFB',
