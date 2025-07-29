@@ -17,7 +17,12 @@ import { Trip, StopStatus } from '@/types';
 import * as Location from 'expo-location';
 import type { LocationObjectCoords } from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { conductorAPI, Trip as APITrip } from '@/services/api';
+import { 
+  Trip as APITrip, 
+  updateTripGPSData, 
+  getTripsByDriver, 
+  updateTrip 
+} from '@/services/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -224,14 +229,10 @@ export default function ConductorTrackingScreen() {
 
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('token');
-      if (token) {
-        conductorAPI.setToken(token);
-      }
 
-      // Load all conductor trips
-      const trips = await conductorAPI.getConductorTrips(user.username);
-      console.log('📋 All conductor trips:', trips);
+      // Load all driver trips
+      const trips = await getTripsByDriver(user.username);
+      console.log('📋 All driver trips:', trips);
 
       // Filter to only show in-progress trips
       const inProgressTrips = trips.filter(
@@ -249,13 +250,13 @@ export default function ConductorTrackingScreen() {
         console.log('📋 Found in-progress trip:', activeTrip.trip_id);
         console.log('   Trip status:', activeTrip.trip_status);
         console.log('   Trip started state:', tripStarted);
-        console.log('   Waiting for conductor to start GPS tracking...');
+        console.log('   Waiting for driver to start GPS tracking...');
       } else {
         console.log('📋 No in-progress trips found');
         setSelectedTrip(null);
       }
     } catch (error: any) {
-      console.error('Error loading conductor trips:', error);
+      console.error('Error loading driver trips:', error);
     } finally {
       setLoading(false);
     }
@@ -293,7 +294,7 @@ export default function ConductorTrackingScreen() {
       console.log('📤 Sending GPS data to backend:', gpsData);
 
       // Store GPS data in trips table using API
-      const result = await conductorAPI.storeGPSData(gpsData);
+      const result = await updateTripGPSData(selectedTrip.trip_id, gpsData);
 
       console.log('✅ GPS data stored successfully in trips table');
       console.log('   Backend response:', result);
@@ -582,13 +583,13 @@ export default function ConductorTrackingScreen() {
             console.log('   Address:', address);
             console.log('   Timestamp:', new Date().toISOString());
 
-            await conductorAPI.updateConductorLocation({
-              trip_id: selectedTrip.trip_id,
+            // Update trip location using updateTrip API
+            await updateTrip(selectedTrip.trip_id, {
               latitude: loc.coords.latitude,
               longitude: loc.coords.longitude,
               address: address,
             });
-            console.log('✅ Conductor location updated successfully');
+            console.log('✅ Driver location updated successfully');
 
             // Also store GPS data in trips table every 10 seconds
             console.log(
@@ -735,7 +736,7 @@ export default function ConductorTrackingScreen() {
 
     try {
       // Update trip status to in_progress
-      await conductorAPI.updateTripStatus(selectedTrip.trip_id, 'in_progress');
+      await updateTrip(selectedTrip.trip_id, { trip_status: 'in_progress' });
 
       setTripStarted(true);
       setTracking(true);
@@ -772,10 +773,9 @@ export default function ConductorTrackingScreen() {
       console.log('🛑 Calling API to update trip status to completed...');
       console.log('   Trip ID:', selectedTrip.trip_id);
 
-      const statusUpdateResult = await conductorAPI.updateTripStatus(
-        selectedTrip.trip_id,
-        'completed'
-      );
+      const statusUpdateResult = await updateTrip(selectedTrip.trip_id, {
+        trip_status: 'completed'
+      });
       console.log('✅ Trip status update API response:', statusUpdateResult);
 
       // Update local state to reflect completed status
@@ -842,7 +842,7 @@ export default function ConductorTrackingScreen() {
       console.log('   Vehicle ID:', trip.vehicle_id);
 
       // Update trip status to in_progress
-      await conductorAPI.updateTripStatus(trip.trip_id, 'in_progress');
+      await updateTrip(trip.trip_id, { trip_status: 'in_progress' });
 
       // Update local state
       setAllConductorTrips((prev) =>
@@ -1659,10 +1659,9 @@ export default function ConductorTrackingScreen() {
                   console.log('   Trip ID:', selectedTrip.trip_id);
                   console.log('   Current Status:', selectedTrip.trip_status);
 
-                  const result = await conductorAPI.updateTripStatus(
-                    selectedTrip.trip_id,
-                    'completed'
-                  );
+                  const result = await updateTrip(selectedTrip.trip_id, {
+                    trip_status: 'completed'
+                  });
                   console.log('🧪 Trip status update result:', result);
 
                   Alert.alert(

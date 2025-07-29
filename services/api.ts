@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Trip } from '@/types';
 
-const API_BASE_URL = 'http://192.168.0.150:3001/api';
+const API_BASE_URL = 'http://192.168.0.132:3001/api';
 
 // Types
 export interface TripCreateData {
@@ -383,7 +383,9 @@ export const getServerInfo = () => {
 // Vehicle API Functions
 
 export const getVehiclesByManager = async (managerUsername: string): Promise<any[]> => {
-  return await api(`/vehicles/manager/${managerUsername}`);
+  const response = await api(`/vehicles/manager/${managerUsername}`);
+  // The backend now returns a consistent response format with data property
+  return response.data || [];
 };
 
 // Export types
