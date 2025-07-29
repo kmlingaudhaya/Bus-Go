@@ -51,15 +51,6 @@ export default function ConductorTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
-        options={{
-          title: 'Notifications',
-          tabBarIcon: ({ size, color }) => (
-            <Bell size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',

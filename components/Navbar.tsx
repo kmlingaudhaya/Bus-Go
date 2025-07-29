@@ -95,24 +95,19 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
       case 'driver':
         return [
           {
+            icon: BarChart3,
+            label: t('dashboard') || 'Dashboard',
+            route: '/driver/dashboard',
+          },
+          {
             icon: Bus,
             label: t('my_trips') || 'My Trips',
             route: '/driver/trips',
           },
           {
-            icon: QrCode,
-            label: t('qr_scanner') || 'QR Scanner',
-            route: '/driver/scanner',
-          },
-          {
             icon: MapPin,
             label: t('trip_tracking') || 'Trip Tracking',
             route: '/driver/tracking',
-          },
-          {
-            icon: Ticket,
-            label: t('manual_booking') || 'Manual Booking',
-            route: '/driver/booking',
           },
           ...(raiseTicketItem ? [raiseTicketItem] : []),
           ...commonItems,
@@ -126,23 +121,23 @@ export default function Navbar({ title, notificationCount = 0 }: NavbarProps) {
           },
           {
             icon: Bus,
-            label: t('manage_buses') || 'Manage Buses',
-            route: '/manager/buses',
+            label: t('vehicles_management') || 'Vehicles Management',
+            route: '/manager/vehicles',
           },
           {
             icon: Users,
-            label: t('waiting_list') || 'Waiting List',
-            route: '/manager/waitlist',
+            label: t('drivers_management') || 'Drivers Management',
+            route: '/manager/drivers',
           },
           {
             icon: MapPin,
-            label: t('trip_tracking') || 'Trip Tracking',
-            route: '/manager/tracking',
+            label: t('trip_management') || 'Trip Management',
+            route: '/manager/trips',
           },
           {
-            icon: Ticket,
-            label: t('offline_booking') || 'Offline Booking',
-            route: '/manager/booking',
+            icon: BarChart3,
+            label: t('leaderboard') || 'Leaderboard',
+            route: '/manager/leaderboard',
           },
           ...commonItems,
         ];
@@ -323,6 +318,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     marginRight: 8,
+    borderRadius: 15,
   },
   title: {
     fontSize: 18,

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
+import Navbar from '@/components/Navbar';
 import {
   Bell,
   AlertCircle,
@@ -26,7 +27,7 @@ interface Notification {
   read: boolean;
 }
 
-export default function ManagerNotificationsScreen() {
+export default function NotificationsScreen() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -79,14 +80,14 @@ export default function ManagerNotificationsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
     loadNotifications();
     setRefreshing(false);
   };
 
   const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notification =>
+    setNotifications((prev) =>
+      prev.map((notification) =>
         notification.id === id ? { ...notification, read: true } : notification
       )
     );
@@ -133,51 +134,61 @@ export default function ManagerNotificationsScreen() {
           {getNotificationIcon(item.type)}
         </View>
         <View style={styles.notificationContent}>
-          <Text style={[styles.notificationTitle, !item.read && styles.unreadTitle]}>
+          <Text
+            style={[styles.notificationTitle, !item.read && styles.unreadTitle]}
+          >
             {item.title}
           </Text>
           <Text style={styles.notificationMessage}>{item.message}</Text>
         </View>
         <View style={styles.timestampContainer}>
           <Clock size={14} color="#6B7280" />
-          <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
+          <Text style={styles.timestamp}>
+            {formatTimestamp(item.timestamp)}
+          </Text>
         </View>
       </View>
       {!item.read && <View style={styles.unreadIndicator} />}
     </TouchableOpacity>
   );
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('notifications') || 'Notifications'}</Text>
-        {unreadCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unreadCount}</Text>
-          </View>
-        )}
-      </View>
+      <Navbar title="Notifications" notificationCount={unreadCount} />
 
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id}
-        renderItem={renderNotification}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Bell size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>
-              {t('no_notifications') || 'No notifications yet'}
-            </Text>
-          </View>
-        }
-      />
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            {t('notifications') || 'Notifications'}
+          </Text>
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount}</Text>
+            </View>
+          )}
+        </View>
+
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item.id}
+          renderItem={renderNotification}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Bell size={48} color="#9CA3AF" />
+              <Text style={styles.emptyText}>
+                {t('no_notifications') || 'No notifications yet'}
+              </Text>
+            </View>
+          }
+        />
+      </View>
     </View>
   );
 }
@@ -186,6 +197,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+    paddingTop: 0,
+  },
+  content: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -193,11 +208,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 20,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: 8,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: '#1F2937',
   },

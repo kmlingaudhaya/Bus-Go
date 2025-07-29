@@ -69,18 +69,20 @@ export default function ManagerProfileScreen() {
       <Navbar title="Profile" />
       <ScrollView style={styles.scrollContainer}>
         <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <User size={40} color="#FFFFFF" />
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <User size={40} color="#FFFFFF" />
+            </View>
+            <View style={styles.roleIndicator}>
+              <Shield size={16} color="#FFFFFF" />
+            </View>
           </View>
-          <View style={styles.roleIndicator}>
-            <Shield size={16} color="#FFFFFF" />
+          <View style={styles.userInfo}>
+            <Text style={styles.name}>{user?.username}</Text>
+            <Text style={styles.role}>Manager</Text>
+            <Text style={styles.userId}>ID: {user?.user_id}</Text>
           </View>
         </View>
-        <Text style={styles.name}>{user?.username}</Text>
-        <Text style={styles.role}>Manager</Text>
-        <Text style={styles.userId}>ID: {user?.user_id}</Text>
-      </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -236,15 +238,16 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 20,
     paddingHorizontal: 20,
     marginBottom: 8,
     paddingTop: 16,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 16,
+    marginRight: 16,
   },
   avatar: {
     width: 80,
@@ -282,6 +285,9 @@ const styles = StyleSheet.create({
   userId: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  userInfo: {
+    flex: 1,
   },
   section: {
     backgroundColor: '#FFFFFF',

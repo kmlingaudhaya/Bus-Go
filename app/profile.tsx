@@ -1,115 +1,100 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
+  TextInput,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { router } from 'expo-router';
 import {
-  User as UserIcon,
+  User,
   Mail,
-  Shield,
-  Bell,
-  CreditCard,
-  CircleHelp as HelpCircle,
-  Settings,
-  Star,
+  Phone,
+  MapPin,
+  Building,
+  Edit3,
+  Save,
   LogOut,
+  Shield,
 } from 'lucide-react-native';
-import { useTranslation } from 'react-i18next';
 import Navbar from '@/components/Navbar';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
-  const { t, i18n } = useTranslation();
+  const { t } = useLanguage();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedProfile, setEditedProfile] = useState({
+    username: user?.username || '',
+    email: user?.email || '',
+    phone_number: user?.phone_number || '',
+    organization: user?.organization || '',
+    address: user?.address || '',
+  });
 
-  const handleLogout = () => {
-    Alert.alert(t('logout'), t('logout_confirm'), [
-      { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('logout'),
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/auth');
-        },
-      },
-    ]);
-  };
-
-  // Language Switcher
-  const languages = [
-    { code: 'en', label: 'English' },
-    { code: 'ta', label: 'தமிழ்' },
-  ];
-  const currentLang = i18n.language;
-  const handleChangeLanguage = (lang: string) => {
-    i18n.changeLanguage(lang);
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'user':
+        return 'User';
+      case 'driver':
+        return 'Driver';
+      case 'manager':
+        return 'Manager';
+      default:
+        return 'User';
+    }
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'user':
-        return '#2563EB';
+        return '#3B82F6';
       case 'driver':
-        return '#059669';
+        return '#10B981';
       case 'manager':
-        return '#EA580C';
+        return '#DC2626';
       default:
-        return '#64748B';
+        return '#6B7280';
     }
   };
 
-  const getRoleBackground = (role: string) => {
-    switch (role) {
-      case 'user':
-        return '#EFF6FF';
-      case 'driver':
-        return '#ECFDF5';
-      case 'manager':
-        return '#FFF7ED';
-      default:
-        return '#F8FAFC';
+  const handleSave = async () => {
+    try {
+      // Here you would typically call an API to update the profile
+      Alert.alert(
+        t('success') || 'Success',
+        t('profile_updated') || 'Profile updated successfully'
+      );
+      setIsEditing(false);
+    } catch (error: any) {
+      Alert.alert(
+        t('error') || 'Error',
+        error.message || 'Failed to update profile'
+      );
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'user':
-        return t('role_user');
-      case 'driver':
-        return t('role_driver');
-      case 'manager':
-        return t('role_manager');
-      default:
-        return t('role_user');
-    }
+  const handleLogout = async () => {
+    Alert.alert(
+      t('logout') || 'Logout',
+      t('logout_confirmation') || 'Are you sure you want to logout?',
+      [
+        { text: t('cancel') || 'Cancel', style: 'cancel' },
+        {
+          text: t('logout') || 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/auth');
+          },
+        },
+      ]
+    );
   };
-
-  const menuItems = [
-    { icon: Bell, label: t('notifications'), subtitle: t('manage_alerts') },
-    {
-      icon: CreditCard,
-      label: t('payment_methods'),
-      subtitle: t('cards_wallets'),
-    },
-    { icon: Star, label: t('rate_review'), subtitle: t('share_experience') },
-    {
-      icon: HelpCircle,
-      label: t('help_support'),
-      subtitle: t('get_assistance'),
-    },
-    { icon: Settings, label: t('settings'), subtitle: t('app_preferences') },
-    {
-      icon: Shield,
-      label: t('privacy_policy'),
-      subtitle: t('data_protection'),
-    },
-  ];
 
   return (
     <View style={styles.container}>
@@ -117,157 +102,197 @@ export default function ProfileScreen() {
       <ScrollView style={styles.scrollContainer}>
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {user?.firstname?.charAt(0)?.toUpperCase() ||
-                user?.username?.charAt(0)?.toUpperCase() ||
-                'U'}
-            </Text>
+            <View style={styles.avatar}>
+              <User size={40} color="#FFFFFF" />
+            </View>
+            <View style={styles.roleIndicator}>
+              <Shield size={16} color="#FFFFFF" />
+            </View>
           </View>
-          <Text style={styles.userName}>
-            {user?.firstname || user?.username}
-          </Text>
-          <View
-            style={[
-              styles.roleBadge,
-              { backgroundColor: getRoleBackground(user?.role || 'user') },
-            ]}
-          >
+          <View style={styles.userInfo}>
+            <Text style={styles.name}>{user?.username}</Text>
             <Text
               style={[
-                styles.roleText,
+                styles.role,
                 { color: getRoleColor(user?.role || 'user') },
               ]}
             >
               {getRoleLabel(user?.role || 'user')}
             </Text>
+            <Text style={styles.userId}>ID: {user?.user_id}</Text>
           </View>
         </View>
 
-        {/* Language Switcher */}
-        <View style={styles.languageSwitcher}>
-          {languages.map((lang) => (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {t('personal_information') || 'Personal Information'}
+            </Text>
             <TouchableOpacity
-              key={lang.code}
-              style={[
-                styles.langButton,
-                currentLang === lang.code && styles.langButtonActive,
-              ]}
-              onPress={() => handleChangeLanguage(lang.code)}
-              disabled={currentLang === lang.code}
+              style={styles.editButton}
+              onPress={() => {
+                if (isEditing) {
+                  handleSave();
+                } else {
+                  setIsEditing(true);
+                }
+              }}
             >
-              <Text
-                style={[
-                  styles.langButtonText,
-                  currentLang === lang.code && styles.langButtonTextActive,
-                ]}
-              >
-                {lang.label}
+              {isEditing ? (
+                <Save size={20} color="#DC2626" />
+              ) : (
+                <Edit3 size={20} color="#DC2626" />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.fieldContainer}>
+            <View style={styles.fieldIcon}>
+              <User size={20} color="#6B7280" />
+            </View>
+            <View style={styles.fieldContent}>
+              <Text style={styles.fieldLabel}>
+                {t('username') || 'Username'}
               </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.infoSection}>
-          <View style={styles.infoRow}>
-            <UserIcon size={20} color="#64748B" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('username')}</Text>
-              <Text style={styles.infoValue}>{user?.username}</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editedProfile.username}
+                  onChangeText={(text) =>
+                    setEditedProfile({ ...editedProfile, username: text })
+                  }
+                />
+              ) : (
+                <Text style={styles.fieldValue}>{user?.username}</Text>
+              )}
             </View>
           </View>
-          <View style={styles.infoRow}>
-            <Mail size={20} color="#64748B" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{t('email')}</Text>
-              <Text style={styles.infoValue}>{user?.email}</Text>
+
+          <View style={styles.fieldContainer}>
+            <View style={styles.fieldIcon}>
+              <Mail size={20} color="#6B7280" />
+            </View>
+            <View style={styles.fieldContent}>
+              <Text style={styles.fieldLabel}>{t('email') || 'Email'}</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editedProfile.email}
+                  onChangeText={(text) =>
+                    setEditedProfile({ ...editedProfile, email: text })
+                  }
+                  keyboardType="email-address"
+                />
+              ) : (
+                <Text style={styles.fieldValue}>{user?.email}</Text>
+              )}
             </View>
           </View>
-          {user?.firstname && (
-            <View style={styles.infoRow}>
-              <UserIcon size={20} color="#64748B" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>{t('first_name')}</Text>
-                <Text style={styles.infoValue}>{user.firstname}</Text>
-              </View>
+
+          <View style={styles.fieldContainer}>
+            <View style={styles.fieldIcon}>
+              <Phone size={20} color="#6B7280" />
             </View>
-          )}
-          {user?.lastname && (
-            <View style={styles.infoRow}>
-              <UserIcon size={20} color="#64748B" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>{t('last_name')}</Text>
-                <Text style={styles.infoValue}>{user.lastname}</Text>
-              </View>
-            </View>
-          )}
-          {user?.dof && (
-            <View style={styles.infoRow}>
-              <UserIcon size={20} color="#64748B" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>{t('date_of_birth')}</Text>
-                <Text style={styles.infoValue}>{user.dof}</Text>
-              </View>
-            </View>
-          )}
-          {user?.created_at && (
-            <View style={styles.infoRow}>
-              <UserIcon size={20} color="#64748B" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>{t('member_since')}</Text>
-                <Text style={styles.infoValue}>
-                  {new Date(user.created_at).toLocaleDateString('en-IN')}
+            <View style={styles.fieldContent}>
+              <Text style={styles.fieldLabel}>{t('phone') || 'Phone'}</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editedProfile.phone_number}
+                  onChangeText={(text) =>
+                    setEditedProfile({ ...editedProfile, phone_number: text })
+                  }
+                  keyboardType="phone-pad"
+                />
+              ) : (
+                <Text style={styles.fieldValue}>
+                  {user?.phone_number || 'Not provided'}
                 </Text>
-              </View>
+              )}
             </View>
-          )}
-          {/* Role-based extra info example */}
-          {user?.role === 'driver' && (
-            <View style={styles.infoRow}>
-              <UserIcon size={20} color="#64748B" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>{t('driver_info')}</Text>
-                <Text style={styles.infoValue}>{t('special_info_driver')}</Text>
-              </View>
+          </View>
+
+          <View style={styles.fieldContainer}>
+            <View style={styles.fieldIcon}>
+              <Building size={20} color="#6B7280" />
             </View>
-          )}
-          {user?.role === 'manager' && (
-            <View style={styles.infoRow}>
-              <UserIcon size={20} color="#64748B" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>{t('manager_info')}</Text>
-                <Text style={styles.infoValue}>
-                  {t('special_info_manager')}
+            <View style={styles.fieldContent}>
+              <Text style={styles.fieldLabel}>
+                {t('organization') || 'Organization'}
+              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editedProfile.organization}
+                  onChangeText={(text) =>
+                    setEditedProfile({ ...editedProfile, organization: text })
+                  }
+                />
+              ) : (
+                <Text style={styles.fieldValue}>
+                  {user?.organization || 'Not provided'}
                 </Text>
-              </View>
+              )}
             </View>
-          )}
+          </View>
+
+          <View style={styles.fieldContainer}>
+            <View style={styles.fieldIcon}>
+              <MapPin size={20} color="#6B7280" />
+            </View>
+            <View style={styles.fieldContent}>
+              <Text style={styles.fieldLabel}>{t('address') || 'Address'}</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editedProfile.address}
+                  onChangeText={(text) =>
+                    setEditedProfile({ ...editedProfile, address: text })
+                  }
+                  multiline
+                />
+              ) : (
+                <Text style={styles.fieldValue}>
+                  {user?.address || 'Not provided'}
+                </Text>
+              )}
+            </View>
+          </View>
         </View>
 
-        <View style={styles.menuSection}>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity key={index} style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIcon}>
-                  <item.icon size={20} color="#64748B" />
-                </View>
-                <View style={styles.menuContent}>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                </View>
-              </View>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {t('account_actions') || 'Account Actions'}
+          </Text>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <LogOut size={20} color="#DC2626" />
-          <Text style={styles.logoutText}>{t('logout')}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() =>
+              Alert.alert(
+                'Coming Soon',
+                'Change password feature will be available soon'
+              )
+            }
+          >
+            <Shield size={20} color="#3B82F6" />
+            <Text style={[styles.actionText, { color: '#3B82F6' }]}>
+              {t('change_password') || 'Change Password'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
+            <LogOut size={20} color="#DC2626" />
+            <Text style={[styles.actionText, { color: '#DC2626' }]}>
+              {t('logout') || 'Logout'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>{t('app_version')}</Text>
-          <Text style={styles.footerSubtext}>{t('made_with_love')}</Text>
+          <Text style={styles.footerText}>
+            {t('member_since') || 'Member since'}{' '}
+            {new Date(user?.created_at || '').toLocaleDateString()}
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -277,191 +302,131 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F9FAFB',
     paddingTop: 0,
   },
   scrollContainer: {
     flex: 1,
   },
   header: {
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 32,
-    backgroundColor: '#DC2626', // changed from blue
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+    paddingTop: 16,
   },
   avatarContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
+    backgroundColor: '#DC2626',
     justifyContent: 'center',
-    marginBottom: 16,
+    alignItems: 'center',
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#DC2626', // changed from blue
+  roleIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
-  userName: {
+  name: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  role: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  userId: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  section: {
+    backgroundColor: '#FFFFFF',
     marginBottom: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
-  roleBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  roleText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  infoSection: {
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  infoRow: {
+  sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  infoContent: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  menuSection: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  menuItemLeft: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  editButton: {
+    padding: 8,
+  },
+  fieldContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
+  fieldIcon: {
     marginRight: 12,
+    marginTop: 2,
   },
-  menuContent: {
+  fieldContent: {
     flex: 1,
   },
-  menuLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 2,
-  },
-  menuSubtitle: {
+  fieldLabel: {
     fontSize: 14,
-    color: '#64748B',
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
   },
-  menuArrow: {
-    fontSize: 20,
-    color: '#CBD5E1',
+  fieldValue: {
+    fontSize: 16,
+    color: '#1F2937',
   },
-  logoutButton: {
+  fieldInput: {
+    fontSize: 16,
+    color: '#1F2937',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingVertical: 4,
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginBottom: 16,
     paddingVertical: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
-  logoutText: {
-    marginLeft: 8,
+  actionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#DC2626',
+    marginLeft: 12,
   },
   footer: {
+    padding: 20,
     alignItems: 'center',
-    paddingVertical: 24,
-    paddingBottom: 40,
   },
   footerText: {
     fontSize: 14,
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  footerSubtext: {
-    fontSize: 12,
-    color: '#94A3B8',
-  },
-  languageSwitcher: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 8,
-    gap: 8,
-  },
-  langButton: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  langButtonActive: {
-    backgroundColor: '#DC2626',
-    borderColor: '#DC2626',
-  },
-  langButtonText: {
-    color: '#1E293B',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  langButtonTextActive: {
-    color: '#fff',
+    color: '#6B7280',
   },
 });
