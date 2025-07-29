@@ -8,10 +8,26 @@ import {
   Alert,
   Image,
   ScrollView,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Animated,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
-import { Bus, Mail, Lock, User, Phone, MapPin, Calendar, CreditCard, Heart } from 'lucide-react-native';
+import {
+  Mail,
+  Lock,
+  User,
+  Phone,
+  MapPin,
+  Calendar,
+  CreditCard,
+  Heart,
+  ChevronDown,
+  Eye,
+  EyeOff,
+} from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function AuthScreen() {
@@ -19,6 +35,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [firstname, setFirstname] = useState('');
   const [lastname, setLastname] = useState('');
   const [dof, setDof] = useState('');
@@ -37,7 +54,7 @@ export default function AuthScreen() {
   const [bloodGroup, setBloodGroup] = useState('');
   const [emergencyContactNumber, setEmergencyContactNumber] = useState('');
   const [gender, setGender] = useState('');
-  
+
   // Manager fields
   const [phoneNumber, setPhoneNumber] = useState('');
   const [organization, setOrganization] = useState('');
@@ -46,26 +63,60 @@ export default function AuthScreen() {
   const [showGenderDropdown, setShowGenderDropdown] = useState(false);
   const [showBloodGroupDropdown, setShowBloodGroupDropdown] = useState(false);
 
+  // Form validation states
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
   const { login, register } = useAuth();
   const { t, language } = useLanguage();
 
   const genderOptions = ['Male', 'Female', 'Other'];
   const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-  const validateDriverFields = () => {
-    if (!licenseNumber) {
-      Alert.alert(t('error'), 'License number is required for drivers');
-      return false;
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
+
+    if (isLogin) {
+      if (!(email || username)) {
+        newErrors.email = 'Email or username is required';
+      }
+      if (!password) {
+        newErrors.password = 'Password is required';
+      }
+    } else {
+      if (!username) {
+        newErrors.username = 'Username is required';
+      }
+      if (!email) {
+        newErrors.email = 'Email is required';
+      } else if (!/\S+@\S+\.\S+/.test(email)) {
+        newErrors.email = 'Please enter a valid email';
+      }
+      if (!password) {
+        newErrors.password = 'Password is required';
+      } else if (password.length < 6) {
+        newErrors.password = 'Password must be at least 6 characters';
+      }
+      if (!firstname) {
+        newErrors.firstname = 'First name is required';
+      }
+      if (!lastname) {
+        newErrors.lastname = 'Last name is required';
+      }
+      if (role === 'driver' && !licenseNumber) {
+        newErrors.licenseNumber = 'License number is required for drivers';
+      }
     }
-    return true;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleAuth = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     if (isLogin) {
-      if (!(email || username) || !password) {
-        Alert.alert(t('error'), t('auth_enter_credentials'));
-        return;
-      }
       setLoading(true);
       try {
         await login(email || username, password);
@@ -76,16 +127,6 @@ export default function AuthScreen() {
         setLoading(false);
       }
     } else {
-      if (!username || !email || !password || !role) {
-        Alert.alert(t('error'), t('fill_required_fields'));
-        return;
-      }
-
-      // Role-specific validation
-      if (role === 'driver' && !validateDriverFields()) {
-        return;
-      }
-
       setLoading(true);
       try {
         const registrationData: any = {
@@ -119,13 +160,37 @@ export default function AuthScreen() {
         }
 
         await register(registrationData);
-        Alert.alert(t('success') || 'Success', t('registration_success') || 'Registration successful! Please log in.');
+        Alert.alert(
+          t('success') || 'Success',
+          t('registration_success') || 'Registration successful! Please log in.'
+        );
         setIsLogin(true);
+        // Clear form
+        setUsername('');
+        setEmail('');
+        setPassword('');
+        setFirstname('');
+        setLastname('');
+        setDof('');
+        setErrors({});
       } catch (error: any) {
-        Alert.alert(t('error'), error.message || t('registration_failed') || 'Registration failed');
+        Alert.alert(
+          t('error'),
+          error.message || t('registration_failed') || 'Registration failed'
+        );
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const clearErrors = (field: string) => {
+    if (errors[field]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
 
@@ -135,15 +200,29 @@ export default function AuthScreen() {
         <>
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>License Number *</Text>
-            <View style={styles.inputWrapper}>
-              <CreditCard size={20} color="#6B7280" />
+            <View
+              style={[
+                styles.inputWrapper,
+                errors.licenseNumber && styles.inputError,
+              ]}
+            >
+              <CreditCard
+                size={20}
+                color={errors.licenseNumber ? '#DC2626' : '#6B7280'}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="Enter your license number"
                 value={licenseNumber}
-                onChangeText={setLicenseNumber}
+                onChangeText={(text) => {
+                  setLicenseNumber(text);
+                  clearErrors('licenseNumber');
+                }}
               />
             </View>
+            {errors.licenseNumber && (
+              <Text style={styles.errorText}>{errors.licenseNumber}</Text>
+            )}
           </View>
 
           <View style={styles.inputContainer}>
@@ -219,21 +298,27 @@ export default function AuthScreen() {
               <Heart size={20} color="#6B7280" />
               <TouchableOpacity
                 style={styles.input}
-                onPress={() => setShowBloodGroupDropdown(!showBloodGroupDropdown)}
+                onPress={() =>
+                  setShowBloodGroupDropdown(!showBloodGroupDropdown)
+                }
               >
-                <Text style={bloodGroup ? styles.selectedText : styles.placeholderText}>
+                <Text
+                  style={
+                    bloodGroup ? styles.selectedText : styles.placeholderText
+                  }
+                >
                   {bloodGroup || 'Select blood group'}
                 </Text>
               </TouchableOpacity>
               {showBloodGroupDropdown && (
                 <View style={styles.dropdown}>
-                  {bloodGroupOptions.map(bg => (
-                    <TouchableOpacity 
-                      key={bg} 
-                      style={styles.dropdownItem} 
-                      onPress={() => { 
-                        setBloodGroup(bg); 
-                        setShowBloodGroupDropdown(false); 
+                  {bloodGroupOptions.map((bg) => (
+                    <TouchableOpacity
+                      key={bg}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setBloodGroup(bg);
+                        setShowBloodGroupDropdown(false);
                       }}
                     >
                       <Text>{bg}</Text>
@@ -266,19 +351,21 @@ export default function AuthScreen() {
                 style={styles.input}
                 onPress={() => setShowGenderDropdown(!showGenderDropdown)}
               >
-                <Text style={gender ? styles.selectedText : styles.placeholderText}>
+                <Text
+                  style={gender ? styles.selectedText : styles.placeholderText}
+                >
                   {gender || 'Select gender'}
                 </Text>
               </TouchableOpacity>
               {showGenderDropdown && (
                 <View style={styles.dropdown}>
-                  {genderOptions.map(g => (
-                    <TouchableOpacity 
-                      key={g} 
-                      style={styles.dropdownItem} 
-                      onPress={() => { 
-                        setGender(g); 
-                        setShowGenderDropdown(false); 
+                  {genderOptions.map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setGender(g);
+                        setShowGenderDropdown(false);
                       }}
                     >
                       <Text>{g}</Text>
@@ -360,19 +447,21 @@ export default function AuthScreen() {
                 style={styles.input}
                 onPress={() => setShowGenderDropdown(!showGenderDropdown)}
               >
-                <Text style={gender ? styles.selectedText : styles.placeholderText}>
+                <Text
+                  style={gender ? styles.selectedText : styles.placeholderText}
+                >
                   {gender || 'Select gender'}
                 </Text>
               </TouchableOpacity>
               {showGenderDropdown && (
                 <View style={styles.dropdown}>
-                  {genderOptions.map(g => (
-                    <TouchableOpacity 
-                      key={g} 
-                      style={styles.dropdownItem} 
-                      onPress={() => { 
-                        setGender(g); 
-                        setShowGenderDropdown(false); 
+                  {genderOptions.map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setGender(g);
+                        setShowGenderDropdown(false);
                       }}
                     >
                       <Text>{g}</Text>
@@ -389,181 +478,302 @@ export default function AuthScreen() {
   };
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.headerSection}>
-        <Image
-          source={{
-            uri: 'https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg?auto=compress&cs=tinysrgb&w=400',
-          }}
-          style={styles.headerImage}
-        />
-        <View style={styles.headerOverlay}>
-          <Bus size={48} color="#FFFFFF" />
-          <Text style={styles.title}>{t('tnstc_hero_title') || 'Tamil Nadu State Transport'}</Text>
-          <Text style={styles.subtitle}>{t('tnstc_hero_subtitle') || 'Government of Tamil Nadu'}</Text>
-          <Text style={styles.tagline}>{t('tnstc_hero_tagline') || 'Safe • Reliable • Affordable'}</Text>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.headerSection}>
+          <View style={styles.headerBackground}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('@/assets/images/icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.title}>STARTRIT</Text>
+            <Text style={styles.subtitle}>Smart Transportation Solutions</Text>
+            <Text style={styles.tagline}>Safe • Efficient • Connected</Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.formContainer}>
-        <View style={styles.form}>
-          <Text style={styles.formTitle}>
-            {isLogin ? t('welcome_back') || 'Welcome Back' : t('create_account') || 'Create Account'}
-          </Text>
-          <Text style={styles.formSubtitle}>
-            {isLogin
-              ? t('sign_in_subtitle') || 'Sign in to your account'
-              : t('create_account_subtitle') || 'Register for TNSTC services'}
-          </Text>
+        <View style={styles.formContainer}>
+          <View style={styles.form}>
+            <Text style={styles.formTitle}>
+              {isLogin
+                ? t('welcome_back') || 'Welcome Back'
+                : t('create_account') || 'Create Account'}
+            </Text>
+            <Text style={styles.formSubtitle}>
+              {isLogin
+                ? t('sign_in_subtitle') || 'Sign in to your Startrit account'
+                : t('create_account_subtitle') ||
+                  'Join Startrit for smart transportation'}
+            </Text>
 
-          {!isLogin && (
-            <>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{t('role_label') || 'Role'} *</Text>
-                <View style={styles.inputWrapper}>
-                  <TouchableOpacity
-                    style={styles.input}
-                    onPress={() => setShowRoleDropdown(!showRoleDropdown)}
+            {!isLogin && (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>
+                    {t('role_label') || 'Role'} *
+                  </Text>
+                  <View style={styles.inputWrapper}>
+                    <TouchableOpacity
+                      style={styles.input}
+                      onPress={() => setShowRoleDropdown(!showRoleDropdown)}
+                    >
+                      <Text style={styles.selectedText}>
+                        {t('role_' + role) || role}
+                      </Text>
+                    </TouchableOpacity>
+                    <ChevronDown size={20} color="#6B7280" />
+                    {showRoleDropdown && (
+                      <View style={styles.dropdown}>
+                        {['user', 'driver', 'manager'].map((r) => (
+                          <TouchableOpacity
+                            key={r}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              setRole(r);
+                              setShowRoleDropdown(false);
+                            }}
+                          >
+                            <Text>{t('role_' + r) || r}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>
+                    {t('username_label') || 'Username'} *
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputWrapper,
+                      errors.username && styles.inputError,
+                    ]}
                   >
-                    <Text style={styles.selectedText}>{t('role_' + role) || role}</Text>
-                  </TouchableOpacity>
-                  {showRoleDropdown && (
-                    <View style={styles.dropdown}>
-                      {['user', 'driver', 'manager'].map(r => (
-                        <TouchableOpacity 
-                          key={r} 
-                          style={styles.dropdownItem} 
-                          onPress={() => { 
-                            setRole(r); 
-                            setShowRoleDropdown(false); 
-                          }}
-                        >
-                          <Text>{t('role_' + r) || r}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
+                    <User
+                      size={20}
+                      color={errors.username ? '#DC2626' : '#6B7280'}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder={
+                        t('username_placeholder') || 'Enter your username'
+                      }
+                      value={username}
+                      onChangeText={(text) => {
+                        setUsername(text);
+                        clearErrors('username');
+                      }}
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  {errors.username && (
+                    <Text style={styles.errorText}>{errors.username}</Text>
                   )}
                 </View>
-              </View>
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{t('username_label') || 'Username'} *</Text>
-                <View style={styles.inputWrapper}>
-                  <User size={20} color="#6B7280" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('username_placeholder') || 'Enter your username'}
-                    value={username}
-                    onChangeText={setUsername}
-                    autoCapitalize="none"
-                  />
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>
+                    {t('firstname_label') || 'First Name'} *
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputWrapper,
+                      errors.firstname && styles.inputError,
+                    ]}
+                  >
+                    <User
+                      size={20}
+                      color={errors.firstname ? '#DC2626' : '#6B7280'}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder={
+                        t('firstname_placeholder') || 'Enter your first name'
+                      }
+                      value={firstname}
+                      onChangeText={(text) => {
+                        setFirstname(text);
+                        clearErrors('firstname');
+                      }}
+                    />
+                  </View>
+                  {errors.firstname && (
+                    <Text style={styles.errorText}>{errors.firstname}</Text>
+                  )}
                 </View>
-              </View>
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{t('firstname_label') || 'First Name'}</Text>
-                <View style={styles.inputWrapper}>
-                  <User size={20} color="#6B7280" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('firstname_placeholder') || 'Enter your first name'}
-                    value={firstname}
-                    onChangeText={setFirstname}
-                  />
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>
+                    {t('lastname_label') || 'Last Name'} *
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputWrapper,
+                      errors.lastname && styles.inputError,
+                    ]}
+                  >
+                    <User
+                      size={20}
+                      color={errors.lastname ? '#DC2626' : '#6B7280'}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder={
+                        t('lastname_placeholder') || 'Enter your last name'
+                      }
+                      value={lastname}
+                      onChangeText={(text) => {
+                        setLastname(text);
+                        clearErrors('lastname');
+                      }}
+                    />
+                  </View>
+                  {errors.lastname && (
+                    <Text style={styles.errorText}>{errors.lastname}</Text>
+                  )}
                 </View>
-              </View>
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{t('lastname_label') || 'Last Name'}</Text>
-                <View style={styles.inputWrapper}>
-                  <User size={20} color="#6B7280" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('lastname_placeholder') || 'Enter your last name'}
-                    value={lastname}
-                    onChangeText={setLastname}
-                  />
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>
+                    {t('dob_label') || 'Date of Birth'}
+                  </Text>
+                  <View style={styles.inputWrapper}>
+                    <Calendar size={20} color="#6B7280" />
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('dob_placeholder') || 'YYYY-MM-DD'}
+                      value={dof}
+                      onChangeText={setDof}
+                    />
+                  </View>
                 </View>
+
+                {renderRoleSpecificFields()}
+              </>
+            )}
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>
+                {isLogin
+                  ? t('email_label') || 'Email or Username'
+                  : t('email_label') || 'Email Address *'}
+              </Text>
+              <View
+                style={[styles.inputWrapper, errors.email && styles.inputError]}
+              >
+                <Mail size={20} color={errors.email ? '#DC2626' : '#6B7280'} />
+                <TextInput
+                  style={styles.input}
+                  placeholder={
+                    isLogin
+                      ? t('email_username_placeholder') ||
+                        'Enter your email or username'
+                      : t('email_placeholder') || 'Enter your email'
+                  }
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    clearErrors('email');
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
               </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{t('dob_label') || 'Date of Birth'}</Text>
-                <View style={styles.inputWrapper}>
-                  <Calendar size={20} color="#6B7280" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('dob_placeholder') || 'YYYY-MM-DD'}
-                    value={dof}
-                    onChangeText={setDof}
-                  />
-                </View>
-              </View>
-
-              {renderRoleSpecificFields()}
-            </>
-          )}
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>
-              {isLogin ? t('email_label') || 'Email or Username' : t('email_label') || 'Email Address *'}
-            </Text>
-            <View style={styles.inputWrapper}>
-              <Mail size={20} color="#6B7280" />
-              <TextInput
-                style={styles.input}
-                placeholder={isLogin ? t('email_username_placeholder') || 'Enter your email or username' : t('email_placeholder') || 'Enter your email'}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+              {errors.email && (
+                <Text style={styles.errorText}>{errors.email}</Text>
+              )}
             </View>
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>{t('password_label') || 'Password'} *</Text>
-            <View style={styles.inputWrapper}>
-              <Lock size={20} color="#6B7280" />
-              <TextInput
-                style={styles.input}
-                placeholder={t('password_placeholder') || 'Enter your password'}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>
+                {t('password_label') || 'Password'} *
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  errors.password && styles.inputError,
+                ]}
+              >
+                <Lock
+                  size={20}
+                  color={errors.password ? '#DC2626' : '#6B7280'}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder={
+                    t('password_placeholder') || 'Enter your password'
+                  }
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    clearErrors('password');
+                  }}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.passwordToggle}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color="#6B7280" />
+                  ) : (
+                    <Eye size={20} color="#6B7280" />
+                  )}
+                </TouchableOpacity>
+              </View>
+              {errors.password && (
+                <Text style={styles.errorText}>{errors.password}</Text>
+              )}
             </View>
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleAuth}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {isLogin
+                    ? t('sign_in_button') || 'Sign In'
+                    : t('sign_up_button') || 'Sign Up'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.switchButton}
+              onPress={() => {
+                setIsLogin(!isLogin);
+                setErrors({});
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.switchText}>
+                {isLogin
+                  ? t('no_account') + (t('sign_up_link') || 'Sign Up')
+                  : t('have_account') + (t('sign_in_link') || 'Sign In')}
+              </Text>
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleAuth}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading
-                ? t('loading_text') || 'Please wait...'
-                : isLogin
-                ? t('sign_in_button') || 'Sign In'
-                : t('sign_up_button') || 'Sign Up'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.switchButton}
-            onPress={() => setIsLogin(!isLogin)}
-          >
-            <Text style={styles.switchText}>
-              {isLogin
-                ? t('no_account') + (t('sign_up_link') || 'Sign Up')
-                : t('have_account') + (t('sign_in_link') || 'Sign In')}
-            </Text>
-          </TouchableOpacity>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -572,157 +782,193 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     minHeight: '100%',
   },
   headerSection: {
-    height: 250,
+    height: 280,
     position: 'relative',
   },
-  headerImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  headerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(220, 38, 38, 0.9)',
+  headerBackground: {
+    flex: 1,
+    backgroundColor: 'linear-gradient(135deg, #FF6B35 0%, #DC2626 100%)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 40,
   },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  logo: {
+    width: 60,
+    height: 60,
+  },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: '800',
     color: '#FFFFFF',
-    marginTop: 16,
+    marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 2,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#FEF2F2',
-    marginTop: 4,
+    marginBottom: 4,
     textAlign: 'center',
+    fontWeight: '500',
   },
   tagline: {
     fontSize: 14,
     color: '#FEF2F2',
-    marginTop: 8,
     textAlign: 'center',
+    fontWeight: '400',
+    opacity: 0.9,
   },
   formContainer: {
     flex: 1,
     padding: 20,
-    marginTop: -20,
+    marginTop: -30,
   },
   form: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
+    padding: 28,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
     marginBottom: 24,
   },
   formTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: '#1F2937',
     textAlign: 'center',
     marginBottom: 8,
   },
   formSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
+    lineHeight: 22,
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
     position: 'relative',
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    borderWidth: 2,
     borderColor: '#E5E7EB',
     position: 'relative',
+  },
+  inputError: {
+    borderColor: '#DC2626',
+    backgroundColor: '#FEF2F2',
   },
   input: {
     flex: 1,
     fontSize: 16,
     color: '#1F2937',
-    marginLeft: 8,
+    marginLeft: 12,
+  },
+  passwordToggle: {
+    padding: 4,
   },
   selectedText: {
     color: '#1F2937',
     fontSize: 16,
+    fontWeight: '500',
   },
   placeholderText: {
     color: '#9CA3AF',
     fontSize: 16,
   },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
   dropdown: {
     position: 'absolute',
-    top: 60,
+    top: 70,
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#E5E7EB',
-    borderRadius: 8,
+    borderRadius: 12,
     zIndex: 1000,
     maxHeight: 200,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
   dropdownItem: {
-    padding: 12,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   button: {
     backgroundColor: '#DC2626',
-    borderRadius: 8,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingVertical: 18,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
   },
   switchButton: {
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 24,
+    paddingVertical: 8,
   },
   switchText: {
     color: '#DC2626',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
