@@ -8,10 +8,20 @@ import {
   RefreshControl,
   Image,
   ActivityIndicator,
+  Alert,
+  Modal,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getVehiclesByManager } from '@/services/api';
+import {
+  getVehiclesByManager,
+  createVehicle,
+  updateVehicle,
+  deleteVehicle,
+  Vehicle,
+} from '@/services/api';
 import {
   Truck,
   MapPin,
@@ -19,28 +29,11 @@ import {
   Fuel,
   Settings,
   Plus,
+  Edit,
+  Trash2,
+  X,
 } from 'lucide-react-native';
-
-interface Vehicle {
-  vehicle_id: string;
-  license_plate: string;
-  vehicle_type: string;
-  make: string;
-  model: string;
-  year: number;
-  status: string;
-  location?: string;
-  image_url?: string;
-  accidents?: number;
-  km_driven?: number;
-  remaining_fuel?: number;
-  service_date?: string;
-  inspection_date?: string;
-  service_type?: string;
-  manager_username: string;
-  created_at: string;
-  updated_at: string;
-}
+import { router } from 'expo-router';
 
 export default function ManagerVehiclesScreen() {
   const { user } = useAuth();
@@ -49,6 +42,24 @@ export default function ManagerVehiclesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [formData, setFormData] = useState({
+    license_plate: '',
+    vehicle_type: '',
+    make: '',
+    model: '',
+    year: '',
+    location: '',
+    accidents: '0',
+    km_driven: '0',
+    remaining_fuel: '',
+    tire_pressure: '',
+    service_date: '',
+    inspection_date: '',
+    service_type: '',
+  });
 
   useEffect(() => {
     loadVehicles();
@@ -71,7 +82,130 @@ export default function ManagerVehiclesScreen() {
   };
 
   const onRefresh = async () => {
+    setRefreshing(true);
     await loadVehicles();
+    setRefreshing(false);
+  };
+
+  const handleAddVehicle = async () => {
+    try {
+      const vehicleData = {
+        ...formData,
+        year: parseInt(formData.year),
+        accidents: parseInt(formData.accidents),
+        km_driven: parseInt(formData.km_driven),
+        remaining_fuel: formData.remaining_fuel
+          ? parseFloat(formData.remaining_fuel)
+          : null,
+        tire_pressure: formData.tire_pressure
+          ? parseFloat(formData.tire_pressure)
+          : null,
+        manager_username: user?.username,
+      };
+
+      await createVehicle(vehicleData);
+      setShowAddModal(false);
+      resetForm();
+      loadVehicles();
+      Alert.alert('Success', 'Vehicle added successfully!');
+    } catch (err) {
+      console.error('Failed to add vehicle:', err);
+      Alert.alert('Error', 'Failed to add vehicle. Please try again.');
+    }
+  };
+
+  const handleEditVehicle = async () => {
+    if (!selectedVehicle) return;
+
+    try {
+      const vehicleData = {
+        ...formData,
+        year: parseInt(formData.year),
+        accidents: parseInt(formData.accidents),
+        km_driven: parseInt(formData.km_driven),
+        remaining_fuel: formData.remaining_fuel
+          ? parseFloat(formData.remaining_fuel)
+          : null,
+        tire_pressure: formData.tire_pressure
+          ? parseFloat(formData.tire_pressure)
+          : null,
+      };
+
+      await updateVehicle(selectedVehicle.vehicle_id, vehicleData);
+      setShowEditModal(false);
+      setSelectedVehicle(null);
+      resetForm();
+      loadVehicles();
+      Alert.alert('Success', 'Vehicle updated successfully!');
+    } catch (err) {
+      console.error('Failed to update vehicle:', err);
+      Alert.alert('Error', 'Failed to update vehicle. Please try again.');
+    }
+  };
+
+  const handleDeleteVehicle = async (vehicle: Vehicle) => {
+    Alert.alert(
+      'Delete Vehicle',
+      `Are you sure you want to delete ${vehicle.license_plate}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteVehicle(vehicle.vehicle_id);
+              loadVehicles();
+              Alert.alert('Success', 'Vehicle deleted successfully!');
+            } catch (err) {
+              console.error('Failed to delete vehicle:', err);
+              Alert.alert(
+                'Error',
+                'Failed to delete vehicle. Please try again.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const resetForm = () => {
+    setFormData({
+      license_plate: '',
+      vehicle_type: '',
+      make: '',
+      model: '',
+      year: '',
+      location: '',
+      accidents: '0',
+      km_driven: '0',
+      remaining_fuel: '',
+      tire_pressure: '',
+      service_date: '',
+      inspection_date: '',
+      service_type: '',
+    });
+  };
+
+  const openEditModal = (vehicle: Vehicle) => {
+    setSelectedVehicle(vehicle);
+    setFormData({
+      license_plate: vehicle.license_plate,
+      vehicle_type: vehicle.vehicle_type,
+      make: vehicle.make,
+      model: vehicle.model,
+      year: vehicle.year.toString(),
+      location: vehicle.location || '',
+      accidents: vehicle.accidents?.toString() || '0',
+      km_driven: vehicle.km_driven?.toString() || '0',
+      remaining_fuel: vehicle.remaining_fuel?.toString() || '',
+      tire_pressure: vehicle.tire_pressure?.toString() || '',
+      service_date: vehicle.service_date || '',
+      inspection_date: vehicle.inspection_date || '',
+      service_type: vehicle.service_type || '',
+    });
+    setShowEditModal(true);
   };
 
   const getStatusColor = (status: string) => {

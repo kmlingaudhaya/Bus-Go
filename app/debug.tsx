@@ -10,10 +10,14 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { authStore } from '@/store/authStore';
 import { router } from 'expo-router';
+import { findWorkingIP, COMMON_IPS, testIPAddress } from '@/utils/ipFinder';
+import NetworkTester from '@/components/NetworkTester';
 
 export default function DebugScreen() {
   const { user, loading, testConnection } = useAuth();
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [testingIP, setTestingIP] = useState(false);
+  const [showNetworkTester, setShowNetworkTester] = useState(false);
 
   const addDebugInfo = (info: string) => {
     setDebugInfo((prev) => [
@@ -80,6 +84,52 @@ export default function DebugScreen() {
     }
   };
 
+  const testAllIPAddresses = async () => {
+    setTestingIP(true);
+    addDebugInfo('Testing all common IP addresses...');
+
+    for (const ip of COMMON_IPS) {
+      addDebugInfo(`Testing IP: ${ip}`);
+      const isWorking = await testIPAddress(ip);
+      addDebugInfo(`${ip}: ${isWorking ? '✅ WORKING' : '❌ FAILED'}`);
+
+      if (isWorking) {
+        Alert.alert(
+          'Working IP Found!',
+          `IP ${ip} is working. Update your API_BASE_URL in services/api.ts and authStore.ts to use this IP.`,
+          [
+            { text: 'OK' },
+            {
+              text: 'Copy IP',
+              onPress: () => {
+                // You can implement clipboard functionality here
+                addDebugInfo(`Use this IP: ${ip}`);
+              },
+            },
+          ]
+        );
+        break;
+      }
+    }
+
+    setTestingIP(false);
+    addDebugInfo('IP testing completed');
+  };
+
+  if (showNetworkTester) {
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setShowNetworkTester(false)}
+        >
+          <Text style={styles.backButtonText}>← Back to Debug</Text>
+        </TouchableOpacity>
+        <NetworkTester />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Debug Information</Text>
@@ -110,6 +160,23 @@ export default function DebugScreen() {
           onPress={handleConductorRoleIssue}
         >
           <Text style={styles.buttonText}>Fix Conductor Role</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, testingIP && styles.buttonDisabled]}
+          onPress={testAllIPAddresses}
+          disabled={testingIP}
+        >
+          <Text style={styles.buttonText}>
+            {testingIP ? 'Testing IPs...' : 'Test All IPs'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowNetworkTester(true)}
+        >
+          <Text style={styles.buttonText}>Network Tester</Text>
         </TouchableOpacity>
       </View>
 
@@ -162,6 +229,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    backgroundColor: '#9CA3AF', // A gray color for disabled state
+    opacity: 0.7,
+  },
+  backButton: {
+    marginBottom: 10,
+    padding: 10,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
   },
   logContainer: {
     flex: 1,
