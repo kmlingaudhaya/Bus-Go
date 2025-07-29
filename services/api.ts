@@ -50,7 +50,6 @@ const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
   }
 };
 
-// Types
 export interface TripCreateData {
   vehicle_id: number;
   start_time: string;

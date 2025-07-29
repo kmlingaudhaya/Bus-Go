@@ -29,6 +29,7 @@ export type User = {
 };
 
 export interface Bus {
+  [x: string]: ReactNode;
   id: string;
   name: string;
   number: string;

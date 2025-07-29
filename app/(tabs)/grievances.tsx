@@ -119,7 +119,7 @@ export default function GrievancesScreen() {
       case 'in_progress': return <Clock size={16} color="#3B82F6" />;
       case 'resolved': return <CheckCircle size={16} color="#059669" />;
       case 'rejected': return <XCircle size={16} color="#DC2626" />;
-      default: return <Clock size={16} color="#6B7280" />;
+      default: return <AlertTriangle size={16} color="#6B7280" />;
     }
   };
 
@@ -143,41 +143,27 @@ export default function GrievancesScreen() {
       Alert.alert('Error', 'Please fill all required fields');
       return;
     }
-
     const newGrievance: Grievance = {
-      id: Date.now().toString(),
+      id: (grievances.length + 1).toString(),
       type: selectedType as any,
       title,
       description,
-      busNumber: busNumber || undefined,
-      route: route || undefined,
+      busNumber,
+      route,
       status: 'pending',
       createdAt: new Date(),
       priority: selectedPriority as any,
-      ticketNumber: `GRV-${new Date().getFullYear()}-${String(grievances.length + 1).padStart(3, '0')}`,
+      ticketNumber: `GRV-2024-00${grievances.length + 1}`,
     };
-
     setGrievances([newGrievance, ...grievances]);
     setShowNewGrievanceModal(false);
-    resetForm();
-    Alert.alert('Success', 'Your grievance has been submitted successfully');
-  };
-
-  const resetForm = () => {
     setSelectedType('');
     setSelectedPriority('');
     setTitle('');
     setDescription('');
     setBusNumber('');
     setRoute('');
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    Alert.alert('Submitted', 'Your grievance has been submitted.');
   };
 
   return (
@@ -185,89 +171,104 @@ export default function GrievancesScreen() {
       <Navbar title="Grievances" />
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Report Issues</Text>
-          <Text style={styles.headerSubtitle}>
-            Help us improve our services by reporting any issues you encounter
-          </Text>
+        <View style={styles.headerContainer}>
+          <Text style={styles.title}>Grievances</Text>
+          <Text style={styles.subtitle}>Report and track your issues</Text>
         </View>
 
-        {/* New Grievance Button */}
-        <TouchableOpacity
-          style={styles.newGrievanceButton}
-          onPress={() => setShowNewGrievanceModal(true)}
-        >
-          <Plus size={20} color="#FFFFFF" />
-          <Text style={styles.newGrievanceButtonText}>Report New Issue</Text>
-        </TouchableOpacity>
-
-        {/* Grievances List */}
-        <View style={styles.grievancesSection}>
-          <Text style={styles.sectionTitle}>Your Complaints</Text>
-          {grievances.map((grievance) => (
-            <View key={grievance.id} style={styles.grievanceCard}>
-              <View style={styles.grievanceHeader}>
-                <View style={styles.grievanceType}>
-                  {grievanceTypes.find(t => t.key === grievance.type)?.icon}
-                  <Text style={styles.grievanceTypeText}>
-                    {getTypeLabel(grievance.type)}
-                  </Text>
-                </View>
-                <View style={styles.grievanceStatus}>
-                  {getStatusIcon(grievance.status)}
-                  <Text style={[styles.statusText, { color: getStatusColor(grievance.status) }]}>
-                    {grievance.status.replace('_', ' ').toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={styles.grievanceTitle}>{grievance.title}</Text>
-              <Text style={styles.grievanceDescription}>{grievance.description}</Text>
-
-              {grievance.busNumber && (
-                <View style={styles.grievanceDetail}>
-                  <Bus size={14} color="#6B7280" />
-                  <Text style={styles.grievanceDetailText}>Bus: {grievance.busNumber}</Text>
-                </View>
-              )}
-
-              {grievance.route && (
-                <View style={styles.grievanceDetail}>
-                  <MapPin size={14} color="#6B7280" />
-                  <Text style={styles.grievanceDetailText}>Route: {grievance.route}</Text>
-                </View>
-              )}
-
-              <View style={styles.grievanceFooter}>
-                <View style={styles.grievanceMeta}>
-                  <Text style={styles.ticketNumber}>#{grievance.ticketNumber}</Text>
-                  <Text style={styles.grievanceDate}>
-                    {formatDate(grievance.createdAt)}
-                  </Text>
-                </View>
-                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(grievance.priority) + '20' }]}>
-                  <Text style={[styles.priorityText, { color: getPriorityColor(grievance.priority) }]}>
-                    {getPriorityLabel(grievance.priority)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Support Information */}
-        <View style={styles.supportSection}>
-          <Text style={styles.sectionTitle}>Need Immediate Help?</Text>
-          <View style={styles.supportCard}>
-            <View style={styles.supportItem}>
-              <Phone size={20} color="#DC2626" />
-              <Text style={styles.supportText}>Emergency: 1800-425-1234</Text>
-            </View>
-            <View style={styles.supportItem}>
-              <Mail size={20} color="#DC2626" />
-              <Text style={styles.supportText}>Email: grievances@tnstc.in</Text>
-            </View>
+        {/* Filter Bar */}
+        <View style={styles.filtersContainer}>
+          <View style={styles.filtersHeader}>
+            <AlertTriangle size={16} color="#DC2626" />
+            <Text style={styles.filtersTitle}>Type</Text>
           </View>
+          <View style={styles.filtersGrid}>
+            {grievanceTypes.map((type) => (
+              <TouchableOpacity
+                key={type.key}
+                style={[
+                  styles.filterButton,
+                  selectedType === type.key && styles.selectedFilterButton,
+                ]}
+                onPress={() => setSelectedType(type.key)}
+              >
+                {type.icon}
+                <Text
+                  style={[
+                    styles.filterButtonText,
+                    selectedType === type.key && styles.selectedFilterButtonText,
+                  ]}
+                >
+                  {type.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowNewGrievanceModal(true)}
+            >
+              <Plus size={16} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>New</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Grievance List */}
+        <View style={styles.listContainer}>
+          {grievances.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <AlertTriangle size={48} color="#E5E7EB" />
+              <Text style={styles.emptyText}>No grievances found</Text>
+              <Text style={styles.emptySubtext}>You have not reported any issues yet.</Text>
+            </View>
+          ) : (
+            grievances
+              .filter(g => !selectedType || g.type === selectedType)
+              .map((g) => (
+                <View key={g.id} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardTypeIcon}>
+                      {grievanceTypes.find(t => t.key === g.type)?.icon}
+                    </View>
+                    <Text style={styles.cardTitle}>{g.title}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(g.status) + '20' }]}>
+                      {getStatusIcon(g.status)}
+                      <Text style={[styles.statusText, { color: getStatusColor(g.status) }]}>
+                        {g.status.replace('_', ' ').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.cardDescription}>{g.description}</Text>
+                  <View style={styles.cardDetailsRow}>
+                    {g.busNumber && (
+                      <View style={styles.detailItem}>
+                        <Bus size={14} color="#DC2626" />
+                        <Text style={styles.detailText}>{g.busNumber}</Text>
+                      </View>
+                    )}
+                    {g.route && (
+                      <View style={styles.detailItem}>
+                        <MapPin size={14} color="#059669" />
+                        <Text style={styles.detailText}>{g.route}</Text>
+                      </View>
+                    )}
+                    <View style={styles.detailItem}>
+                      <Text style={[styles.priorityBadge, { backgroundColor: getPriorityColor(g.priority) + '20' }]}>
+                        <Text style={[styles.priorityText, { color: getPriorityColor(g.priority) }]}>
+                          {getPriorityLabel(g.priority)}
+                        </Text>
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.ticketNumber}>Ticket: {g.ticketNumber}</Text>
+                    <Text style={styles.dateText}>
+                      {g.createdAt.toLocaleDateString()}
+                    </Text>
+                  </View>
+                </View>
+              ))
+          )}
         </View>
       </ScrollView>
 
@@ -280,133 +281,91 @@ export default function GrievancesScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Report New Issue</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowNewGrievanceModal(false);
-                  resetForm();
-                }}
-              >
-                <XCircle size={24} color="#6B7280" />
-              </TouchableOpacity>
+            <Text style={styles.modalTitle}>New Grievance</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Title"
+              value={title}
+              onChangeText={setTitle}
+            />
+            <TextInput
+              style={[styles.input, { height: 80 }]}
+              placeholder="Description"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Bus Number (optional)"
+              value={busNumber}
+              onChangeText={setBusNumber}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Route (optional)"
+              value={route}
+              onChangeText={setRoute}
+            />
+            <Text style={styles.modalLabel}>Type</Text>
+            <View style={styles.modalTypeGrid}>
+              {grievanceTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.key}
+                  style={[
+                    styles.modalTypeButton,
+                    selectedType === type.key && styles.selectedModalTypeButton,
+                  ]}
+                  onPress={() => setSelectedType(type.key)}
+                >
+                  {type.icon}
+                  <Text
+                    style={[
+                      styles.modalTypeButtonText,
+                      selectedType === type.key && styles.selectedModalTypeButtonText,
+                    ]}
+                  >
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-
-            <ScrollView style={styles.modalBody}>
-              {/* Issue Type */}
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Issue Type *</Text>
-                <View style={styles.typeGrid}>
-                  {grievanceTypes.map((type) => (
-                    <TouchableOpacity
-                      key={type.key}
-                      style={[
-                        styles.typeOption,
-                        selectedType === type.key && styles.selectedTypeOption,
-                      ]}
-                      onPress={() => setSelectedType(type.key)}
-                    >
-                      {type.icon}
-                      <Text style={[
-                        styles.typeOptionText,
-                        selectedType === type.key && styles.selectedTypeOptionText,
-                      ]}>
-                        {type.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Priority */}
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Priority *</Text>
-                <View style={styles.priorityGrid}>
-                  {priorityLevels.map((priority) => (
-                    <TouchableOpacity
-                      key={priority.key}
-                      style={[
-                        styles.priorityOption,
-                        { borderColor: priority.color },
-                        selectedPriority === priority.key && { backgroundColor: priority.color + '20' },
-                      ]}
-                      onPress={() => setSelectedPriority(priority.key)}
-                    >
-                      <Text style={[
-                        styles.priorityOptionText,
-                        { color: priority.color },
-                        selectedPriority === priority.key && { fontWeight: 'bold' },
-                      ]}>
-                        {priority.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Title */}
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Title *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="Brief description of the issue"
-                  multiline
-                />
-              </View>
-
-              {/* Description */}
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Description *</Text>
-                <TextInput
-                  style={[styles.textInput, styles.textArea]}
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder="Please provide detailed information about the issue..."
-                  multiline
-                  numberOfLines={4}
-                />
-              </View>
-
-              {/* Bus Number */}
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Bus Number (Optional)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={busNumber}
-                  onChangeText={setBusNumber}
-                  placeholder="e.g., TN-01-AB-1234"
-                />
-              </View>
-
-              {/* Route */}
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Route (Optional)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={route}
-                  onChangeText={setRoute}
-                  placeholder="e.g., Chennai - Madurai"
-                />
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setShowNewGrievanceModal(false);
-                  resetForm();
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+            <Text style={styles.modalLabel}>Priority</Text>
+            <View style={styles.modalPriorityGrid}>
+              {priorityLevels.map((p) => (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[
+                    styles.modalPriorityButton,
+                    selectedPriority === p.key && styles.selectedModalPriorityButton,
+                  ]}
+                  onPress={() => setSelectedPriority(p.key)}
+                >
+                  <Text
+                    style={[
+                      styles.modalPriorityButtonText,
+                      selectedPriority === p.key && { color: p.color },
+                    ]}
+                  >
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.submitButton}
                 onPress={handleSubmitGrievance}
               >
+                <CheckCircle size={16} color="#FFFFFF" />
                 <Text style={styles.submitButtonText}>Submit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowNewGrievanceModal(false)}
+              >
+                <XCircle size={16} color="#DC2626" />
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -423,282 +382,318 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
   },
-  header: {
-    marginTop: 16,
-    marginBottom: 20,
+  headerContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    paddingTop: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  headerTitle: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#DC2626',
+    textAlign: 'center',
     marginBottom: 8,
   },
-  headerSubtitle: {
+  subtitle: {
     fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
+    color: '#64748B',
+    textAlign: 'center',
   },
-  newGrievanceButton: {
+  filtersContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  filtersHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#DC2626',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    marginBottom: 12,
   },
-  newGrievanceButtonText: {
-    color: '#FFFFFF',
+  filtersTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#374151',
     marginLeft: 8,
   },
-  grievancesSection: {
-    marginBottom: 24,
+  filtersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 16,
-  },
-  grievanceCard: {
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 8,
+    marginRight: 8,
   },
-  grievanceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  selectedFilterButton: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
   },
-  grievanceType: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  grievanceTypeText: {
-    fontSize: 12,
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#6B7280',
     marginLeft: 6,
-    fontWeight: '500',
   },
-  grievanceStatus: {
+  selectedFilterButtonText: {
+    color: '#FFFFFF',
+  },
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginLeft: 8,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: 6,
+    fontSize: 14,
+  },
+  listContainer: {
+    padding: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cardTypeIcon: {
+    marginRight: 8,
+  },
+  cardTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
   },
   statusText: {
     fontSize: 10,
     fontWeight: '600',
     marginLeft: 4,
   },
-  grievanceTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+  cardDescription: {
+    fontSize: 13,
+    color: '#6B7280',
     marginBottom: 8,
   },
-  grievanceDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  grievanceDetail: {
+  cardDetailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
+    gap: 12,
   },
-  grievanceDetailText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 6,
-  },
-  grievanceFooter: {
+  detailItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    marginRight: 12,
   },
-  grievanceMeta: {
-    flex: 1,
-  },
-  ticketNumber: {
+  detailText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  grievanceDate: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 2,
+    color: '#374151',
+    marginLeft: 4,
   },
   priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   priorityText: {
     fontSize: 10,
     fontWeight: '600',
   },
-  supportSection: {
-    marginBottom: 24,
-  },
-  supportCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  supportItem: {
+  cardFooter: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginTop: 8,
   },
-  supportText: {
+  ticketNumber: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#64748B',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  emptySubtext: {
     fontSize: 14,
-    color: '#1F2937',
-    marginLeft: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderRadius: 20,
+    width: '90%',
+    maxWidth: 400,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#DC2626',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    fontSize: 14,
     color: '#1F2937',
   },
-  modalBody: {
-    padding: 20,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  formSection: {
-    marginBottom: 20,
-  },
-  formLabel: {
+  modalLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#374151',
     marginBottom: 8,
+    marginTop: 8,
   },
-  typeGrid: {
+  modalTypeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 12,
   },
-  typeOption: {
-    width: '48%',
+  modalTypeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
     marginBottom: 8,
-  },
-  selectedTypeOption: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#DC2626',
-  },
-  typeOptionText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 8,
-  },
-  selectedTypeOptionText: {
-    color: '#DC2626',
-    fontWeight: '600',
-  },
-  priorityGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  priorityOption: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  priorityOptionText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    color: '#1F2937',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  cancelButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     marginRight: 8,
   },
-  cancelButtonText: {
-    textAlign: 'center',
+  selectedModalTypeButton: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
+  },
+  modalTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginLeft: 6,
+  },
+  selectedModalTypeButtonText: {
+    color: '#FFFFFF',
+  },
+  modalPriorityGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  modalPriorityButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginRight: 8,
+  },
+  selectedModalPriorityButton: {
+    borderColor: '#DC2626',
+    backgroundColor: '#FEF2F2',
+  },
+  modalPriorityButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
   },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
   submitButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#DC2626',
-    marginLeft: 8,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   submitButtonText: {
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
     color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 14,
   },
-}); 
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  cancelButtonText: {
+    color: '#DC2626',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+});

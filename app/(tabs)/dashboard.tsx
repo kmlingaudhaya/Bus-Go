@@ -130,23 +130,25 @@ export default function DashboardScreen() {
       <Navbar title="Dashboard" />
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <View style={styles.welcomeContent}>
-            <Text style={styles.greeting}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{userName}!</Text>
-            <Text style={styles.welcomeSubtitle}>
-              Welcome to TNSTC Bus Booking
-            </Text>
-          </View>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <User size={32} color="#DC2626" />
+        <View style={styles.sectionCard}>
+          <View style={styles.welcomeSection}>
+            <View style={styles.welcomeContent}>
+              <Text style={styles.greeting}>{getGreeting()},</Text>
+              <Text style={styles.userName}>{userName}!</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Welcome to TNSTC Bus Booking
+              </Text>
+            </View>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <User size={32} color="#DC2626" />
+              </View>
             </View>
           </View>
         </View>
 
         {/* Trip Statistics */}
-        <View style={styles.statsSection}>
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Your Journey Stats</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
@@ -181,7 +183,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.quickActionsSection}>
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
             {quickActions.map((action) => (
@@ -189,6 +191,7 @@ export default function DashboardScreen() {
                 key={action.id}
                 style={[styles.quickActionCard, { backgroundColor: action.color }]}
                 onPress={() => handleQuickAction(action.route)}
+                activeOpacity={0.85}
               >
                 <View style={styles.quickActionIcon}>{action.icon}</View>
                 <Text style={styles.quickActionTitle}>{action.title}</Text>
@@ -199,7 +202,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* Recent Activity */}
-        <View style={styles.recentActivitySection}>
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Recent Activity</Text>
           <View style={styles.activityList}>
             <View style={styles.activityItem}>
@@ -211,6 +214,7 @@ export default function DashboardScreen() {
                 <Text style={styles.activityTime}>2 hours ago</Text>
               </View>
             </View>
+            <View style={styles.activityDivider} />
             <View style={styles.activityItem}>
               <View style={styles.activityIcon}>
                 <Star size={16} color="#F59E0B" />
@@ -220,6 +224,7 @@ export default function DashboardScreen() {
                 <Text style={styles.activityTime}>1 day ago</Text>
               </View>
             </View>
+            <View style={styles.activityDivider} />
             <View style={styles.activityItem}>
               <View style={styles.activityIcon}>
                 <MapPin size={16} color="#7C3AED" />
@@ -233,7 +238,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* Support Contact */}
-        <View style={styles.supportSection}>
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Need Help?</Text>
           <View style={styles.supportCard}>
             <View style={styles.supportItem}>
@@ -254,26 +259,28 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F3F4F6', // subtle background
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
+  },
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 16,
+    marginBottom: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   welcomeSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   welcomeContent: {
     flex: 1,
@@ -307,9 +314,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FECACA',
   },
-  statsSection: {
-    marginBottom: 24,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -322,7 +326,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   statCard: {
-    width: (width - 48) / 2,
+    width: (width - 64) / 2,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
@@ -330,9 +334,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   statIcon: {
     width: 40,
@@ -353,25 +357,22 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 4,
   },
-  quickActionsSection: {
-    marginBottom: 24,
-  },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   quickActionCard: {
-    width: (width - 48) / 2,
+    width: (width - 64) / 2,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3,
   },
   quickActionIcon: {
     marginBottom: 8,
@@ -389,25 +390,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
   },
-  recentActivitySection: {
-    marginBottom: 24,
-  },
   activityList: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  activityDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 16,
   },
   activityIcon: {
     width: 32,
@@ -431,18 +433,15 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
-  supportSection: {
-    marginBottom: 24,
-  },
   supportCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   supportItem: {
     flexDirection: 'row',
@@ -454,4 +453,4 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginLeft: 12,
   },
-}); 
+});
