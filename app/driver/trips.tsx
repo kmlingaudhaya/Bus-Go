@@ -21,7 +21,13 @@ import {
   Play,
   Bus,
 } from 'lucide-react-native';
-import { getTripsByDriver, updateTripStatus, testConnection, getServerInfo, Trip as APITrip } from '@/services/api';
+import {
+  getTripsByDriver,
+  updateTripStatus,
+  testConnection,
+  getServerInfo,
+  Trip as APITrip,
+} from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -107,7 +113,10 @@ export default function DriverTripsScreen() {
           ]
         );
       } else {
-        Alert.alert('Error', 'Failed to fetch trips. Please try again.');
+        Alert.alert('Error', 'Failed to fetch trips. Please try again.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Retry', onPress: () => fetchDriverTrips() },
+        ]);
       }
     } finally {
       setLoading(false);
@@ -119,12 +128,12 @@ export default function DriverTripsScreen() {
     action: 'accept' | 'decline' | 'start'
   ) => {
     Alert.alert(
-      'Confirm Action',
+      `Confirm ${action}`,
       `Are you sure you want to ${action} this trip?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Confirm',
+          text: action.charAt(0).toUpperCase() + action.slice(1),
           onPress: async () => {
             try {
               let newStatus: string;
@@ -235,9 +244,7 @@ export default function DriverTripsScreen() {
               ? `${user.firstname} ${user.lastname || ''}`
               : user?.username}
           </Text>
-          <Text style={styles.employeeId}>
-            {t('user_id', { id: user?.user_id })}
-          </Text>
+          <Text style={styles.employeeId}>User ID: {user?.user_id}</Text>
 
           {/* Network Status Indicator */}
           <View
@@ -302,142 +309,88 @@ export default function DriverTripsScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('assigned_trips')}</Text>
-
-          {assignedTrips.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Bus size={48} color="#DC2626" />
-              <Text style={styles.emptyText}>{t('no_trips_assigned')}</Text>
-              <Text style={styles.emptySubtext}>
-                {networkStatus === 'offline'
-                  ? t('unable_to_connect')
-                  : t('no_trips_assigned_subtext')}
-              </Text>
-              {networkStatus === 'offline' && (
-                <TouchableOpacity
-                  style={styles.retryButton}
-                  onPress={fetchDriverTrips}
-                >
-                  <Text style={styles.retryButtonText}>
-                    {t('retry_connection')}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : (
-            assignedTrips.map((trip) => (
-              <View key={trip.trip_id} style={styles.tripCard}>
-                <View style={styles.tripHeader}>
-                  <View style={styles.routeInfo}>
-                    <Text style={styles.tripRoute}>
-                      {trip.start_location} → {trip.end_location}
-                    </Text>
-                    <Text style={styles.vehicleNumber}>
-                      {trip.vehicle_number || t('vehicle_na')}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: getStatusBgColor(trip.trip_status) },
-                    ]}
-                  >
-                    <Text
+        {/* Current Trip Section */}
+        {assignedTrips.filter((trip) => trip.trip_status === 'in_progress')
+          .length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Current Trip</Text>
+            {assignedTrips
+              .filter((trip) => trip.trip_status === 'in_progress')
+              .map((trip) => (
+                <View key={trip.trip_id} style={styles.tripCard}>
+                  <View style={styles.tripHeader}>
+                    <View style={styles.routeInfo}>
+                      <Text style={styles.tripRoute}>
+                        {trip.start_location} → {trip.end_location}
+                      </Text>
+                      <Text style={styles.vehicleNumber}>
+                        Vehicle ID: {trip.vehicle_id || t('vehicle_na')}
+                      </Text>
+                    </View>
+                    <View
                       style={[
-                        styles.statusText,
-                        { color: getStatusColor(trip.trip_status) },
+                        styles.statusBadge,
+                        { backgroundColor: getStatusBgColor(trip.trip_status) },
                       ]}
                     >
-                      {t(trip.trip_status) ||
-                        trip.trip_status.toUpperCase().replace('_', ' ')}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.tripDetails}>
-                  <View style={styles.tripDetailRow}>
-                    <Clock size={16} color="#6B7280" />
-                    <Text style={styles.tripDetailText}>
-                      {t('start')}: {formatDateTime(trip.start_time)}
-                    </Text>
-                  </View>
-                  {trip.driver_first_name && (
-                    <View style={styles.tripDetailRow}>
-                      <Users size={16} color="#6B7280" />
-                      <Text style={styles.tripDetailText}>
-                        {t('driver')}: {trip.driver_first_name}{' '}
-                        {trip.driver_last_name}
-                      </Text>
-                    </View>
-                  )}
-                  {trip.distance_travelled && (
-                    <View style={styles.tripDetailRow}>
-                      <MapPin size={16} color="#6B7280" />
-                      <Text style={styles.tripDetailText}>
-                        {t('distance')}: {trip.distance_travelled} km
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* GPS Data Display */}
-                  {(trip.latitude || trip.longitude || trip.address) && (
-                    <View style={styles.gpsDataContainer}>
-                      <Text style={styles.gpsDataTitle}>
-                        📍 {t('gps_data')}
-                      </Text>
-                      {trip.latitude && trip.longitude && (
-                        <Text style={styles.gpsDataText}>
-                          {t('coordinates')}: {trip.latitude.toFixed(6)},{' '}
-                          {trip.longitude.toFixed(6)}
-                        </Text>
-                      )}
-                      {trip.address && (
-                        <Text style={styles.gpsDataText}>
-                          {t('address')}: {trip.address}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.tripActions}>
-                  {trip.trip_status === 'pending' && (
-                    <>
-                      <TouchableOpacity
-                        style={[styles.tripButton, styles.acceptButton]}
-                        onPress={() => handleTripAction(trip, 'accept')}
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: getStatusColor(trip.trip_status) },
+                        ]}
                       >
-                        <CheckCircle size={16} color="#FFFFFF" />
-                        <Text style={styles.acceptButtonText}>
-                          {t('accept')}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.tripButton, styles.declineButton]}
-                        onPress={() => handleTripAction(trip, 'decline')}
-                      >
-                        <XCircle size={16} color="#DC2626" />
-                        <Text style={styles.declineButtonText}>
-                          {t('decline')}
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-
-                  {trip.trip_status === 'scheduled' && (
-                    <TouchableOpacity
-                      style={[styles.tripButton, styles.startButton]}
-                      onPress={() => handleTripAction(trip, 'start')}
-                    >
-                      <Play size={16} color="#FFFFFF" />
-                      <Text style={styles.startButtonText}>
-                        {t('start_trip')}
+                        {t(trip.trip_status) ||
+                          trip.trip_status.toUpperCase().replace('_', ' ')}
                       </Text>
-                    </TouchableOpacity>
-                  )}
+                    </View>
+                  </View>
 
-                  {trip.trip_status === 'in_progress' && (
+                  <View style={styles.tripDetails}>
+                    <View style={styles.tripDetailRow}>
+                      <Clock size={16} color="#6B7280" />
+                      <Text style={styles.tripDetailText}>
+                        {t('start')}: {formatDateTime(trip.start_time)}
+                      </Text>
+                    </View>
+                    {trip.driver_username && (
+                      <View style={styles.tripDetailRow}>
+                        <Users size={16} color="#6B7280" />
+                        <Text style={styles.tripDetailText}>
+                          {t('driver')}: {trip.driver_username}
+                        </Text>
+                      </View>
+                    )}
+                    {trip.distance_travelled && (
+                      <View style={styles.tripDetailRow}>
+                        <MapPin size={16} color="#6B7280" />
+                        <Text style={styles.tripDetailText}>
+                          {t('distance')}: {trip.distance_travelled} km
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* GPS Data Display */}
+                    {(trip.latitude || trip.longitude || trip.address) && (
+                      <View style={styles.gpsDataContainer}>
+                        <Text style={styles.gpsDataTitle}>
+                          📍 {t('gps_data')}
+                        </Text>
+                        {trip.latitude && trip.longitude && (
+                          <Text style={styles.gpsDataText}>
+                            {t('coordinates')}: {trip.latitude.toFixed(6)},{' '}
+                            {trip.longitude.toFixed(6)}
+                          </Text>
+                        )}
+                        {trip.address && (
+                          <Text style={styles.gpsDataText}>
+                            {t('address')}: {trip.address}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.tripActions}>
                     <TouchableOpacity
                       style={[styles.tripButton, styles.trackingButton]}
                       onPress={() => {
@@ -461,12 +414,258 @@ export default function DriverTripsScreen() {
                         {t('go_to_tracking')}
                       </Text>
                     </TouchableOpacity>
-                  )}
+                  </View>
                 </View>
-              </View>
-            ))
-          )}
-        </View>
+              ))}
+          </View>
+        )}
+
+        {/* Assigned Trips Section */}
+        {assignedTrips.filter(
+          (trip) =>
+            trip.trip_status !== 'in_progress' &&
+            trip.trip_status !== 'completed'
+        ).length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('assigned_trips')}</Text>
+            {assignedTrips
+              .filter(
+                (trip) =>
+                  trip.trip_status !== 'in_progress' &&
+                  trip.trip_status !== 'completed'
+              )
+              .map((trip) => (
+                <View key={trip.trip_id} style={styles.tripCard}>
+                  <View style={styles.tripHeader}>
+                    <View style={styles.routeInfo}>
+                      <Text style={styles.tripRoute}>
+                        {trip.start_location} → {trip.end_location}
+                      </Text>
+                      <Text style={styles.vehicleNumber}>
+                        Vehicle ID: {trip.vehicle_id || t('vehicle_na')}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: getStatusBgColor(trip.trip_status) },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: getStatusColor(trip.trip_status) },
+                        ]}
+                      >
+                        {t(trip.trip_status) ||
+                          trip.trip_status.toUpperCase().replace('_', ' ')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tripDetails}>
+                    <View style={styles.tripDetailRow}>
+                      <Clock size={16} color="#6B7280" />
+                      <Text style={styles.tripDetailText}>
+                        {t('start')}: {formatDateTime(trip.start_time)}
+                      </Text>
+                    </View>
+                    {trip.driver_username && (
+                      <View style={styles.tripDetailRow}>
+                        <Users size={16} color="#6B7280" />
+                        <Text style={styles.tripDetailText}>
+                          {t('driver')}: {trip.driver_username}
+                        </Text>
+                      </View>
+                    )}
+                    {trip.distance_travelled && (
+                      <View style={styles.tripDetailRow}>
+                        <MapPin size={16} color="#6B7280" />
+                        <Text style={styles.tripDetailText}>
+                          {t('distance')}: {trip.distance_travelled} km
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* GPS Data Display */}
+                    {(trip.latitude || trip.longitude || trip.address) && (
+                      <View style={styles.gpsDataContainer}>
+                        <Text style={styles.gpsDataTitle}>
+                          📍 {t('gps_data')}
+                        </Text>
+                        {trip.latitude && trip.longitude && (
+                          <Text style={styles.gpsDataText}>
+                            {t('coordinates')}: {trip.latitude.toFixed(6)},{' '}
+                            {trip.longitude.toFixed(6)}
+                          </Text>
+                        )}
+                        {trip.address && (
+                          <Text style={styles.gpsDataText}>
+                            {t('address')}: {trip.address}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.tripActions}>
+                    {trip.trip_status === 'pending' && (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.tripButton, styles.acceptButton]}
+                          onPress={() => handleTripAction(trip, 'accept')}
+                        >
+                          <CheckCircle size={16} color="#FFFFFF" />
+                          <Text style={styles.acceptButtonText}>
+                            {t('accept')}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.tripButton, styles.declineButton]}
+                          onPress={() => handleTripAction(trip, 'decline')}
+                        >
+                          <XCircle size={16} color="#DC2626" />
+                          <Text style={styles.declineButtonText}>
+                            {t('decline')}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+                    {trip.trip_status === 'scheduled' && (
+                      <TouchableOpacity
+                        style={[styles.tripButton, styles.startButton]}
+                        onPress={() => handleTripAction(trip, 'start')}
+                      >
+                        <Play size={16} color="#FFFFFF" />
+                        <Text style={styles.startButtonText}>
+                          {t('start_trip')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))}
+          </View>
+        )}
+
+        {/* Trip History Section */}
+        {assignedTrips.filter((trip) => trip.trip_status === 'completed')
+          .length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Trip History</Text>
+            {assignedTrips
+              .filter((trip) => trip.trip_status === 'completed')
+              .map((trip) => (
+                <View key={trip.trip_id} style={styles.tripCard}>
+                  <View style={styles.tripHeader}>
+                    <View style={styles.routeInfo}>
+                      <Text style={styles.tripRoute}>
+                        {trip.start_location} → {trip.end_location}
+                      </Text>
+                      <Text style={styles.vehicleNumber}>
+                        Vehicle ID: {trip.vehicle_id || t('vehicle_na')}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: getStatusBgColor(trip.trip_status) },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: getStatusColor(trip.trip_status) },
+                        ]}
+                      >
+                        {t(trip.trip_status) ||
+                          trip.trip_status.toUpperCase().replace('_', ' ')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tripDetails}>
+                    <View style={styles.tripDetailRow}>
+                      <Clock size={16} color="#6B7280" />
+                      <Text style={styles.tripDetailText}>
+                        {t('start')}: {formatDateTime(trip.start_time)}
+                      </Text>
+                    </View>
+                    {trip.end_time && (
+                      <View style={styles.tripDetailRow}>
+                        <Clock size={16} color="#6B7280" />
+                        <Text style={styles.tripDetailText}>
+                          {t('end')}: {formatDateTime(trip.end_time)}
+                        </Text>
+                      </View>
+                    )}
+                    {trip.driver_username && (
+                      <View style={styles.tripDetailRow}>
+                        <Users size={16} color="#6B7280" />
+                        <Text style={styles.tripDetailText}>
+                          {t('driver')}: {trip.driver_username}
+                        </Text>
+                      </View>
+                    )}
+                    {trip.distance_travelled && (
+                      <View style={styles.tripDetailRow}>
+                        <MapPin size={16} color="#6B7280" />
+                        <Text style={styles.tripDetailText}>
+                          {t('distance')}: {trip.distance_travelled} km
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* GPS Data Display */}
+                    {(trip.latitude || trip.longitude || trip.address) && (
+                      <View style={styles.gpsDataContainer}>
+                        <Text style={styles.gpsDataTitle}>
+                          📍 {t('gps_data')}
+                        </Text>
+                        {trip.latitude && trip.longitude && (
+                          <Text style={styles.gpsDataText}>
+                            {t('coordinates')}: {trip.latitude.toFixed(6)},{' '}
+                            {trip.longitude.toFixed(6)}
+                          </Text>
+                        )}
+                        {trip.address && (
+                          <Text style={styles.gpsDataText}>
+                            {t('address')}: {trip.address}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+          </View>
+        )}
+
+        {/* Empty State */}
+        {assignedTrips.length === 0 && (
+          <View style={styles.section}>
+            <View style={styles.emptyContainer}>
+              <Bus size={48} color="#DC2626" />
+              <Text style={styles.emptyText}>{t('no_trips_assigned')}</Text>
+              <Text style={styles.emptySubtext}>
+                {networkStatus === 'offline'
+                  ? t('unable_to_connect')
+                  : t('no_trips_assigned_subtext')}
+              </Text>
+              {networkStatus === 'offline' && (
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={fetchDriverTrips}
+                >
+                  <Text style={styles.retryButtonText}>
+                    {t('retry_connection')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

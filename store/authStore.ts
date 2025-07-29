@@ -141,6 +141,15 @@ class AuthStore {
     this.notifyListeners();
   }
 
+  async clearStoredData(): Promise<void> {
+    console.log('AuthStore: Clearing all stored authentication data');
+    this.user = null;
+    this.token = null;
+    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem('token');
+    this.notifyListeners();
+  }
+
   async changePassword(
     currentPassword: string,
     newPassword: string
@@ -216,27 +225,53 @@ class AuthStore {
       console.log('AuthStore: Stored user:', storedUser);
       console.log('AuthStore: Stored token exists:', !!storedToken);
 
-      if (storedUser && storedToken) {
-        this.user = JSON.parse(storedUser);
-
-        // Handle role mapping for old stored data
-        if (this.user && this.user.role === 'conductor') {
-          console.log('AuthStore: Mapping old role "conductor" to "driver"');
-          this.user.role = 'driver';
-          // Update the stored data with the new role
-          await AsyncStorage.setItem('user', JSON.stringify(this.user));
-        }
-
-        this.token = storedToken;
+      // If either user or token is missing, clear both and return null
+      if (!storedUser || !storedToken) {
+        console.log('AuthStore: Missing user or token, clearing storage');
+        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('token');
+        this.user = null;
+        this.token = null;
         this.notifyListeners();
-        console.log('AuthStore: Successfully loaded stored user:', this.user);
-        return this.user;
+        return null;
       }
 
-      console.log('AuthStore: No stored user found');
-      return null;
+      // Parse the stored user
+      const parsedUser = JSON.parse(storedUser);
+
+      // Validate that the parsed user has required fields
+      if (!parsedUser || !parsedUser.user_id || !parsedUser.username) {
+        console.log('AuthStore: Invalid stored user data, clearing storage');
+        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('token');
+        this.user = null;
+        this.token = null;
+        this.notifyListeners();
+        return null;
+      }
+
+      this.user = parsedUser;
+
+      // Handle role mapping for old stored data
+      if (this.user && this.user.role === 'conductor') {
+        console.log('AuthStore: Mapping old role "conductor" to "driver"');
+        this.user.role = 'driver';
+        // Update the stored data with the new role
+        await AsyncStorage.setItem('user', JSON.stringify(this.user));
+      }
+
+      this.token = storedToken;
+      this.notifyListeners();
+      console.log('AuthStore: Successfully loaded stored user:', this.user);
+      return this.user;
     } catch (error) {
       console.error('AuthStore: Error loading stored user:', error);
+      // Clear corrupted data
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('token');
+      this.user = null;
+      this.token = null;
+      this.notifyListeners();
       return null;
     }
   }

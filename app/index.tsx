@@ -6,7 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { authStore } from '@/store/authStore';
 
 export default function Index() {
-  const { user, loading } = useAuth();
+  const { user, loading, clearStoredData } = useAuth();
   const { t } = useLanguage();
 
   console.log('Index component - user:', user, 'loading:', loading);
@@ -84,7 +84,7 @@ export default function Index() {
                     text: 'Clear Data',
                     style: 'destructive',
                     onPress: async () => {
-                      await authStore.logout();
+                      await clearStoredData();
                       router.replace('/auth');
                     },
                   },
