@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Trip } from '@/types';
 
-const API_BASE_URL = 'http://192.168.0.132:3001/api';
+const API_BASE_URL = 'http://192.168.29.127:3001/api';
 
-// Types
+
 export interface TripCreateData {
   vehicle_id: number;
   start_time: string;

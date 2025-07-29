@@ -202,7 +202,6 @@ export default function ProfileScreen() {
               <Edit size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-          
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{userName}</Text>
             <Text style={styles.profileEmail}>{userEmail}</Text>
@@ -317,9 +316,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   profileImageContainer: {
     position: 'relative',
@@ -393,9 +392,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   statNumber: {
     fontSize: 18,
@@ -425,9 +424,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   actionIcon: {
     marginBottom: 8,
@@ -443,9 +442,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   settingItem: {
     flexDirection: 'row',

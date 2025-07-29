@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import TicketCard from '@/components/TicketCard';
 import { mockBookings } from '@/data/mockData';
 import { Booking } from '@/types';
-import { Calendar, Clock, MapPin, Filter } from 'lucide-react-native';
+import { Calendar, Filter } from 'lucide-react-native';
 
 export default function TicketsScreen() {
   const { user } = useAuth();
@@ -13,7 +13,7 @@ export default function TicketsScreen() {
 
   useEffect(() => {
     // Filter bookings for current user
-    const userBookings = mockBookings.filter(booking => booking.userId === user?.id);
+    const userBookings = mockBookings.filter(booking => booking.userId === String(user?.user_id));
     setBookings(userBookings);
   }, [user]);
 
@@ -32,13 +32,13 @@ export default function TicketsScreen() {
     <TouchableOpacity
       style={[
         styles.filterButton,
-        filter === filterType && styles.filterButtonActive
+        filter === filterType && styles.filterButton
       ]}
       onPress={() => setFilter(filterType)}
     >
       <Text style={[
         styles.filterButtonText,
-        filter === filterType && styles.filterButtonTextActive
+        filter === filterType && styles.filterButtonText
       ]}>
         {label}
       </Text>
@@ -48,7 +48,7 @@ export default function TicketsScreen() {
   if (user?.role !== 'passenger') {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.headerContainer}>
           <Text style={styles.title}>Access Denied</Text>
         </View>
         <View style={styles.emptyContainer}>
@@ -60,22 +60,49 @@ export default function TicketsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* Header */}
+      <View style={styles.headerContainer}>
         <Text style={styles.title}>My Tickets</Text>
         <Text style={styles.subtitle}>View and manage your bookings</Text>
       </View>
 
-      <View style={styles.filterContainer}>
-        {renderFilterButton('all', 'All')}
-        {renderFilterButton('upcoming', 'Upcoming')}
-        {renderFilterButton('completed', 'Completed')}
+      {/* Filter Bar */}
+      <View style={styles.filtersContainer}>
+        <View style={styles.filtersHeader}>
+          <Filter size={16} color="#6B7280" />
+          <Text style={styles.filtersTitle}>Filter</Text>
+        </View>
+        <View style={styles.filtersGrid}>
+          {['all', 'upcoming', 'completed'].map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.filterButton,
+                filter === type && styles.selectedFilterButton,
+              ]}
+              onPress={() => setFilter(type as typeof filter)}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  filter === type && styles.selectedFilterButtonText,
+                ]}
+              >
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
+      {/* Tickets List */}
       <FlatList
         data={filteredBookings}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TicketCard booking={item} />
+          <View style={styles.card}>
+            <TicketCard booking={item} />
+          </View>
         )}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
@@ -83,7 +110,7 @@ export default function TicketsScreen() {
             <Calendar size={48} color="#CBD5E1" />
             <Text style={styles.emptyText}>No tickets found</Text>
             <Text style={styles.emptySubtext}>
-              {filter === 'upcoming' 
+              {filter === 'upcoming'
                 ? "You don't have any upcoming trips"
                 : filter === 'completed'
                 ? "You don't have any completed trips"
@@ -102,67 +129,100 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  header: {
+  headerContainer: {
+    backgroundColor: '#FFFFFF',
     padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#DC2626', // changed from blue
+    paddingTop: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#FECACA', // changed from #BFDBFE (light blue) to light red
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
   },
-  filterContainer: {
-    flexDirection: 'row',
-    padding: 16,
+  filtersContainer: {
     backgroundColor: '#FFFFFF',
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#E5E7EB',
+  },
+  filtersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  filtersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginLeft: 8,
+  },
+  filtersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    marginRight: 12,
-    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+    marginRight: 8,
   },
-  filterButtonActive: {
-    backgroundColor: '#DC2626', // changed from blue
+  selectedFilterButton: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
   },
   filterButtonText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#64748B',
+    fontWeight: '600',
+    color: '#6B7280',
   },
-  filterButtonTextActive: {
+  selectedFilterButtonText: {
     color: '#FFFFFF',
   },
   listContainer: {
-    flexGrow: 1,
+    padding: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 0,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    padding: 20,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 16,
     color: '#64748B',
-    marginTop: 16,
-    marginBottom: 8,
+    marginBottom: 15,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 16,
-    color: '#94A3B8',
+    fontSize: 14,
+    color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 24,
   },
 });

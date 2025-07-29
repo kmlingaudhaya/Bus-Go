@@ -94,6 +94,24 @@ export default function NotificationsScreen() {
     },
   ];
 
+  // Filter options for notification types
+  const typeOptions = [
+    { key: 'all', label: 'All', icon: <Bell size={16} color="#6B7280" /> },
+    { key: 'booking', label: 'Booking', icon: <Ticket size={16} color="#059669" /> },
+    { key: 'trip', label: 'Trip', icon: <Bus size={16} color="#3B82F6" /> },
+    { key: 'delay', label: 'Delay', icon: <Clock size={16} color="#F59E0B" /> },
+    { key: 'cancellation', label: 'Cancel', icon: <AlertTriangle size={16} color="#DC2626" /> },
+    { key: 'feedback', label: 'Feedback', icon: <Star size={16} color="#7C3AED" /> },
+    { key: 'system', label: 'System', icon: <Info size={16} color="#6B7280" /> },
+  ];
+
+  const [selectedType, setSelectedType] = React.useState('all');
+
+  const filteredNotifications =
+    selectedType === 'all'
+      ? notifications
+      : notifications.filter((n) => n.type === selectedType);
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'booking':
@@ -167,36 +185,65 @@ export default function NotificationsScreen() {
       <Navbar title="Notifications" notificationCount={unreadCount} />
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          <Text style={styles.headerSubtitle}>
+        <View style={styles.headerContainer}>
+          <Text style={styles.title}>Notifications</Text>
+          <Text style={styles.subtitle}>
             Stay updated with your trip information
           </Text>
         </View>
 
+        {/* Filter Bar */}
+        <View style={styles.filtersContainer}>
+          <View style={styles.filtersHeader}>
+            <Bell size={16} color="#6B7280" />
+            <Text style={styles.filtersTitle}>Filter by Type</Text>
+          </View>
+          <View style={styles.filtersGrid}>
+            {typeOptions.map((option) => (
+              <TouchableOpacity
+                key={option.key}
+                style={[
+                  styles.filterButton,
+                  selectedType === option.key && styles.selectedFilterButton,
+                ]}
+                onPress={() => setSelectedType(option.key)}
+              >
+                {option.icon}
+                <Text
+                  style={[
+                    styles.filterButtonText,
+                    selectedType === option.key && styles.selectedFilterButtonText,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         {/* Notifications List */}
         <View style={styles.notificationsList}>
-          {notifications.length === 0 ? (
-            <View style={styles.emptyState}>
+          {filteredNotifications.length === 0 ? (
+            <View style={styles.emptyContainer}>
               <Bell size={48} color="#E5E7EB" />
-              <Text style={styles.emptyStateTitle}>No Notifications</Text>
-              <Text style={styles.emptyStateSubtitle}>
+              <Text style={styles.emptyText}>No notifications found.</Text>
+              <Text style={styles.emptySubtext}>
                 You're all caught up! Check back later for updates.
               </Text>
             </View>
           ) : (
-            notifications.map((notification) => (
+            filteredNotifications.map((notification) => (
               <TouchableOpacity
                 key={notification.id}
                 style={[
-                  styles.notificationCard,
+                  styles.card,
                   !notification.read && styles.unreadNotification,
                 ]}
               >
                 <View style={styles.notificationIcon}>
                   {getNotificationIcon(notification.type)}
                 </View>
-                
                 <View style={styles.notificationContent}>
                   <View style={styles.notificationHeader}>
                     <Text style={styles.notificationTitle}>{notification.title}</Text>
@@ -212,9 +259,7 @@ export default function NotificationsScreen() {
                       </Text>
                     </View>
                   </View>
-                  
                   <Text style={styles.notificationMessage}>{notification.message}</Text>
-                  
                   <View style={styles.notificationFooter}>
                     <Text style={styles.notificationTime}>
                       {formatTimestamp(notification.timestamp)}
@@ -228,34 +273,12 @@ export default function NotificationsScreen() {
             ))
           )}
         </View>
-
-        {/* Notification Types Info */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Notification Types</Text>
-          <View style={styles.infoGrid}>
-            <View style={styles.infoItem}>
-              <Ticket size={16} color="#059669" />
-              <Text style={styles.infoText}>Booking</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Bus size={16} color="#3B82F6" />
-              <Text style={styles.infoText}>Trip</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Clock size={16} color="#F59E0B" />
-              <Text style={styles.infoText}>Delay</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Star size={16} color="#7C3AED" />
-              <Text style={styles.infoText}>Feedback</Text>
-            </View>
-          </View>
-        </View>
       </ScrollView>
     </View>
   );
 }
 
+// Updated styles for trips.tsx look
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -263,54 +286,107 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
   },
-  header: {
-    marginTop: 16,
-    marginBottom: 20,
+  headerContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    paddingTop: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    marginBottom: 0,
   },
-  headerTitle: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#DC2626',
+    textAlign: 'center',
     marginBottom: 8,
   },
-  headerSubtitle: {
+  subtitle: {
     fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  filtersContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  filtersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  filtersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginLeft: 8,
+  },
+  filtersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+    marginRight: 8,
+  },
+  selectedFilterButton: {
+    backgroundColor: '#DC2626',
+    borderColor: '#DC2626',
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#6B7280',
-    lineHeight: 20,
+    marginLeft: 6,
+  },
+  selectedFilterButtonText: {
+    color: '#FFFFFF',
   },
   notificationsList: {
+    padding: 16,
     marginBottom: 24,
   },
-  emptyState: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    padding: 20,
   },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#6B7280',
-    marginTop: 16,
-    marginBottom: 8,
+  emptyText: {
+    fontSize: 16,
+    color: '#64748B',
+    marginBottom: 15,
+    textAlign: 'center',
   },
-  emptyStateSubtitle: {
+  emptySubtext: {
     fontSize: 14,
     color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 20,
   },
-  notificationCard: {
+  card: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   unreadNotification: {
     borderLeftWidth: 4,
@@ -370,37 +446,5 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#DC2626',
-  },
-  infoSection: {
-    marginBottom: 24,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 12,
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '50%',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 6,
   },
 });

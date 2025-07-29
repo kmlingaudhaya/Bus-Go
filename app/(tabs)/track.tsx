@@ -25,7 +25,7 @@ export default function TrackingScreen() {
   useEffect(() => {
     // Get active bookings for current user
     const userBookings = mockBookings.filter(
-      (booking) => booking.userId === user?.id && booking.status === 'confirmed'
+      (booking) => String(booking.userId) === String(user?.user_id) && booking.status === 'confirmed'
     );
     setActiveBookings(userBookings);
     if (userBookings.length > 0) {
@@ -36,7 +36,7 @@ export default function TrackingScreen() {
   if (user?.role !== 'passenger') {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.headerContainer}>
           <Text style={styles.title}>Access Denied</Text>
         </View>
         <View style={styles.emptyContainer}>
@@ -51,7 +51,7 @@ export default function TrackingScreen() {
   if (activeBookings.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.headerContainer}>
           <Text style={styles.title}>Trip Tracking</Text>
           <Text style={styles.subtitle}>Live bus location</Text>
         </View>
@@ -77,46 +77,47 @@ export default function TrackingScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
+      <View style={styles.headerContainer}>
         <Text style={styles.title}>Trip Tracking</Text>
         <Text style={styles.subtitle}>Live bus location</Text>
       </View>
 
       {/* Trip Selector */}
-      <View style={styles.tripSelector}>
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Active Trips</Text>
-        {activeBookings.map((booking) => (
-          <TouchableOpacity
-            key={booking.id}
-            style={[
-              styles.tripOption,
-              selectedBooking?.id === booking.id && styles.selectedTrip,
-            ]}
-            onPress={() => setSelectedBooking(booking)}
-          >
-            <Text style={styles.tripRoute}>
-              {/* Route info would come from bus data */}
-              Chennai → Madurai
-            </Text>
-            <Text style={styles.tripPnr}>PNR: {booking.pnr}</Text>
-          </TouchableOpacity>
-        ))}
+        <View style={styles.card}>
+          {activeBookings.map((booking) => (
+            <TouchableOpacity
+              key={booking.id}
+              style={[
+                styles.tripOption,
+                selectedBooking?.id === booking.id && styles.selectedTrip,
+              ]}
+              onPress={() => setSelectedBooking(booking)}
+            >
+              <Text style={styles.tripRoute}>Chennai → Madurai</Text>
+              <Text style={styles.tripPnr}>PNR: {booking.pnr}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {/* Map Placeholder */}
-      <View style={styles.mapContainer}>
-        <View style={styles.mapPlaceholder}>
-          <MapPin size={32} color="#2563EB" />
-          <Text style={styles.mapText}>Live Bus Location</Text>
-          <Text style={styles.mapSubtext}>Map integration coming soon</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Live Location</Text>
+        <View style={styles.card}>
+          <View style={styles.mapPlaceholder}>
+            <MapPin size={32} color="#2563EB" />
+            <Text style={styles.mapText}>Live Bus Location</Text>
+            <Text style={styles.mapSubtext}>Map integration coming soon</Text>
+          </View>
         </View>
       </View>
 
       {/* Trip Status */}
-      <View style={styles.statusContainer}>
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trip Status</Text>
-
-        <View style={styles.statusCard}>
+        <View style={styles.card}>
           <View style={styles.statusRow}>
             <View style={styles.statusIcon}>
               <Navigation size={16} color="#059669" />
@@ -126,7 +127,6 @@ export default function TrackingScreen() {
               <Text style={styles.statusValue}>{mockLocation.city}</Text>
             </View>
           </View>
-
           <View style={styles.statusRow}>
             <View style={styles.statusIcon}>
               <Clock size={16} color="#EA580C" />
@@ -138,7 +138,6 @@ export default function TrackingScreen() {
               </Text>
             </View>
           </View>
-
           <View style={styles.statusRow}>
             <View style={styles.statusIcon}>
               <MapPin size={16} color="#7C3AED" />
@@ -148,7 +147,6 @@ export default function TrackingScreen() {
               <Text style={styles.statusValue}>{mockLocation.nextStop}</Text>
             </View>
           </View>
-
           <View style={styles.statusRow}>
             <View style={styles.statusIcon}>
               <AlertCircle size={16} color="#2563EB" />
@@ -162,18 +160,20 @@ export default function TrackingScreen() {
       </View>
 
       {/* Emergency Contact */}
-      <View style={styles.emergencyContainer}>
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Emergency Contact</Text>
-        <TouchableOpacity style={styles.emergencyButton}>
-          <Phone size={20} color="#FFFFFF" />
-          <Text style={styles.emergencyText}>Call Conductor</Text>
-        </TouchableOpacity>
+        <View style={styles.card}>
+          <TouchableOpacity style={styles.emergencyButton}>
+            <Phone size={20} color="#FFFFFF" />
+            <Text style={styles.emergencyText}>Call Conductor</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Journey Progress */}
-      <View style={styles.progressContainer}>
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Journey Progress</Text>
-        <View style={styles.progressTrack}>
+        <View style={styles.card}>
           <View style={styles.progressStops}>
             <View style={[styles.progressStop, styles.completedStop]}>
               <Text style={styles.stopTime}>06:00</Text>
@@ -207,49 +207,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  header: {
+  headerContainer: {
+    backgroundColor: '#FFFFFF',
     padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#DC2626', // changed from blue
+    paddingTop: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    marginBottom: 0,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#FECACA', // changed from #BFDBFE (light blue) to light red
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 14,
     color: '#64748B',
-    marginTop: 16,
-    marginBottom: 8,
     textAlign: 'center',
   },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  tripSelector: {
-    padding: 16,
+  section: {
+    marginBottom: 24,
+    paddingHorizontal: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 12,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   tripOption: {
     backgroundColor: '#FFFFFF',
@@ -260,8 +257,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedTrip: {
-    borderColor: '#DC2626', // changed from blue
-    backgroundColor: '#FEF2F2', // light red background
+    borderColor: '#DC2626',
+    backgroundColor: '#FEF2F2',
   },
   tripRoute: {
     fontSize: 16,
@@ -273,21 +270,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
   },
-  mapContainer: {
-    margin: 16,
-    height: 200,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   mapPlaceholder: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 120,
   },
   mapText: {
     fontSize: 18,
@@ -299,19 +286,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
     marginTop: 4,
-  },
-  statusContainer: {
-    padding: 16,
-  },
-  statusCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   statusRow: {
     flexDirection: 'row',
@@ -340,9 +314,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
   },
-  emergencyContainer: {
-    padding: 16,
-  },
   emergencyButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -356,20 +327,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
-  },
-  progressContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  progressTrack: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   progressStops: {
     flexDirection: 'row',
@@ -398,6 +355,23 @@ const styles = StyleSheet.create({
   stopName: {
     fontSize: 12,
     color: '#64748B',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#64748B',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
     textAlign: 'center',
   },
 });

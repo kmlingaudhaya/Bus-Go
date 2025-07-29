@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 16, // Added for consistent horizontal padding
   },
   statusBanner: {
     flexDirection: 'row',
@@ -472,6 +472,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 16,
     marginBottom: 20,
+    marginHorizontal: 16, // Added for alignment
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statusContent: {
     flexDirection: 'row',
@@ -498,17 +504,20 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+    paddingHorizontal: 0, // Remove if using content padding
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 16,
+    marginLeft: 8, // Slight indent for alignment
   },
   tripCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
+    marginHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -562,6 +571,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
+    marginHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -622,6 +632,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: '90%',
     maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -715,4 +730,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-}); 
+});
