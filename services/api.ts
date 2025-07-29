@@ -105,22 +105,29 @@ export interface GPSData {
 }
 
 export interface Driver {
-  id: string;
+  id: number;
   username: string;
-  name: string;
-  email: string;
-  phone: string;
-  license_number: string;
-  license_expiry: string;
-  blood_group: string;
-  address: string;
-  status: 'active' | 'inactive' | 'on_trip';
-  rating: number;
-  total_trips: number;
-  join_date: string;
-  manager_username: string;
-  created_at: string;
-  updated_at: string;
+  manager_username?: string;
+  organisation?: string;
+  date_of_birth?: string;
+  mobile_number?: number;
+  address?: string;
+  license_number?: string;
+  license_expire_date?: string;
+  blood_group?: string;
+  verification_status?: string;
+  emergency_contact_number?: number;
+  gender?: string;
+  // Legacy properties for backward compatibility
+  name?: string;
+  email?: string;
+  phone?: string;
+  status?: 'active' | 'inactive' | 'on_trip';
+  rating?: number;
+  total_trips?: number;
+  join_date?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Vehicle {
@@ -416,7 +423,7 @@ export const getDriversByManager = async (
 ): Promise<Driver[]> => {
   try {
     const response = await api(`/drivers/manager/${managerUsername}`);
-    return response.data;
+    return response;
   } catch (error) {
     console.error('Error fetching drivers by manager:', error);
     throw error;
