@@ -8,6 +8,13 @@ declare global {
 
 export function useFrameworkReady() {
   useEffect(() => {
-    window.frameworkReady?.();
-  });
+    // Only call once when component mounts
+    if (typeof window !== 'undefined' && window.frameworkReady) {
+      try {
+        window.frameworkReady();
+      } catch (error) {
+        console.warn('Framework ready callback failed:', error);
+      }
+    }
+  }, []); // Empty dependency array to run only once
 }
