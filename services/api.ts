@@ -3,7 +3,7 @@ import { Trip } from '@/types';
 
 // IMPORTANT: Update this IP address to match your development machine's IP
 // You can find your IP by running 'ipconfig' on Windows or 'ifconfig' on Mac/Linux
-const API_BASE_URL = 'http://192.168.0.150:3001/api';
+const API_BASE_URL = 'https://safeway-backend-75xq.onrender.com/api';
 
 // Alternative IP addresses to try if the above doesn't work:
 // const API_BASE_URL = 'http://10.0.2.2:3001/api'; // For Android emulator

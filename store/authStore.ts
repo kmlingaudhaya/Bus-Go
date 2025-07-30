@@ -3,7 +3,7 @@ import { User } from '@/types';
 
 // IMPORTANT: Update this IP address to match your development machine's IP
 // This should be the same IP address as in services/api.ts
-const API_URL = 'http://192.168.0.150:3001/api/auth';
+const API_URL = 'https://safeway-backend-75xq.onrender.com/api/auth';
 
 class AuthStore {
   private user: User | null = null;
