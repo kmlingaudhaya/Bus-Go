@@ -68,14 +68,7 @@ export default function DriverDashboardScreen() {
       description:
         'Check your current trip status, view trip history, and track your performance.',
     },
-    {
-      icon: QrCode,
-      title: 'QR Scanner',
-      subtitle: 'Scan passenger tickets',
-      route: '/driver/scanner',
-      description:
-        'Scan QR codes to verify passenger tickets and manage boarding.',
-    },
+   
     {
       icon: MapPin,
       title: 'Trip Tracking',
@@ -83,13 +76,6 @@ export default function DriverDashboardScreen() {
       route: '/driver/tracking',
       description:
         'Track your current location, update trip status, and navigate routes.',
-    },
-    {
-      icon: Ticket,
-      title: 'Manual Booking',
-      subtitle: 'Create offline tickets',
-      route: '/driver/booking',
-      description: 'Create tickets for passengers without digital bookings.',
     },
     {
       icon: User,

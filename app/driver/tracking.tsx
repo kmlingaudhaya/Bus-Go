@@ -17,13 +17,30 @@ import { Trip, StopStatus } from '@/types';
 import * as Location from 'expo-location';
 import type { LocationObjectCoords } from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  Trip as APITrip, 
-  updateTripGPSData, 
-  getTripsByDriver, 
-  updateTrip 
+import {
+  Trip as APITrip,
+  updateTripGPSData,
+  getTripsByDriver,
+  updateTrip,
 } from '@/services/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import Navbar from '@/components/Navbar';
+import {
+  Camera,
+  Wifi,
+  Settings,
+  Activity,
+  MapPin,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  X,
+  Plus,
+  Video,
+  WifiOff,
+  Bluetooth,
+  Car,
+} from 'lucide-react-native';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -45,11 +62,11 @@ interface GPSPoint {
 
 interface DetectedStop {
   id: string;
-    latitude: number;
-    longitude: number;
-    placeName: string;
-    startTime: number;
-    endTime: number;
+  latitude: number;
+  longitude: number;
+  placeName: string;
+  startTime: number;
+  endTime: number;
   duration: number; // minutes
   address?: string;
 }
@@ -161,9 +178,10 @@ function calculateSpeed(point1: GPSPoint, point2: GPSPoint): number {
 // =========================
 // Main Component
 // =========================
-export default function ConductorTrackingScreen() {
+export default function DriverTrackingScreen() {
   // -------- State --------
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   const [selectedTrip, setSelectedTrip] = useState<APITrip | null>(null);
   const [allConductorTrips, setAllConductorTrips] = useState<APITrip[]>([]);
   const [tracking, setTracking] = useState(false);
@@ -198,7 +216,15 @@ export default function ConductorTrackingScreen() {
     null
   );
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [gpsIntervalCount, setGpsIntervalCount] = useState(0);
+
+  // Monitoring and OBD states
+  const [monitoringEnabled, setMonitoringEnabled] = useState(false);
+  const [cameraWifiUrl, setCameraWifiUrl] = useState('');
+  const [showMonitoringModal, setShowMonitoringModal] = useState(false);
+  const [obdConnected, setObdConnected] = useState(false);
+  const [showObdModal, setShowObdModal] = useState(false);
+  const [obdDeviceName, setObdDeviceName] = useState('');
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
   // Storage keys
   const STORAGE_KEYS = {
@@ -247,134 +273,125 @@ export default function ConductorTrackingScreen() {
 
       if (activeTrip) {
         setSelectedTrip(activeTrip);
-        console.log('📋 Found in-progress trip:', activeTrip.trip_id);
-        console.log('   Trip status:', activeTrip.trip_status);
-        console.log('   Trip started state:', tripStarted);
-        console.log('   Waiting for driver to start GPS tracking...');
+        console.log('🎯 Active trip selected:', activeTrip.trip_id);
       } else {
-        console.log('📋 No in-progress trips found');
         setSelectedTrip(null);
+        console.log('❌ No active trip found');
       }
     } catch (error: any) {
-      console.error('Error loading driver trips:', error);
+      console.error('❌ Error loading trips:', error);
+      Alert.alert(
+        'Error',
+        `Failed to load trips: ${error?.message || 'Unknown error'}`
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper: Store GPS data in database
   const storeGPSData = async (gpsPoint: GPSPoint) => {
     if (!selectedTrip) {
-      console.log('❌ No selected trip, skipping GPS data storage');
+      console.log('❌ No selected trip for GPS data storage');
       return;
     }
 
     try {
-      console.log('🔄 Attempting to store GPS data...');
-      console.log('   Selected Trip ID:', selectedTrip.trip_id);
-      console.log('   GPS Point:', gpsPoint);
+      console.log('💾 Storing GPS data:', gpsPoint);
 
-      // Calculate speed if we have previous points
-      let speed = 0;
-      if (gpsPoints.length > 0) {
-        const prevPoint = gpsPoints[gpsPoints.length - 1];
-        speed = calculateSpeed(prevPoint, gpsPoint);
-      }
-
-      const gpsData = {
-        vehicle_id: selectedTrip.vehicle_id,
-        trip_id: selectedTrip.trip_id,
+      // Store GPS data in backend
+      const result = await updateTripGPSData(selectedTrip.trip_id, {
         latitude: gpsPoint.latitude,
         longitude: gpsPoint.longitude,
-        speed: speed,
-        heading: 0, // We can calculate this later if needed
-        address: currentAddress, // Include the current address
-      };
+      });
 
-      console.log('📤 Sending GPS data to backend:', gpsData);
+      console.log('✅ GPS data stored successfully:', result);
 
-      // Store GPS data in trips table using API
-      const result = await updateTripGPSData(selectedTrip.trip_id, gpsData);
+      // Add to local state for analytics
+      setGpsPoints((prev) => [...prev, gpsPoint]);
 
-      console.log('✅ GPS data stored successfully in trips table');
-      console.log('   Backend response:', result);
-      console.log('   Trip ID:', selectedTrip.trip_id);
-      console.log(
-        '   Coordinates:',
-        `${gpsPoint.latitude}, ${gpsPoint.longitude}`
-      );
-      console.log('   Speed:', speed.toFixed(2), 'km/h');
-      console.log('   Timestamp:', new Date(gpsPoint.timestamp).toISOString());
+      // Detect stops if we have enough points
+      if (gpsPoints.length > 1) {
+        const stops = detectStops([...gpsPoints, gpsPoint]);
+        setDetectedStops(stops);
+      }
     } catch (error: any) {
       console.error('❌ Error storing GPS data:', error);
-      console.error('   Error details:', error?.message || 'Unknown error');
+      // Don't show alert for every GPS storage failure
+      // Just log it for debugging
     }
   };
 
-  // Helper: Get address from coordinates using reverse geocoding
   const getAddressFromCoords = async (
     latitude: number,
     longitude: number
   ): Promise<string> => {
+    setIsLoadingAddress(true);
     try {
-      // Try using LocationIQ API (free tier available)
-      const apiKey = 'pk.d9fa7499a00623bdcb585d286e703272'; // Your LocationIQ API key
-      const url = `https://us1.locationiq.com/v1/reverse.php?key=${apiKey}&lat=${latitude.toFixed(
-        6
-      )}&lon=${longitude.toFixed(6)}&format=json&addressdetails=1`;
+      console.log('📍 Getting address for coordinates:', latitude, longitude);
 
+      // Use a simple, reliable free service
+      const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`;
+
+      console.log('📍 Fetching from BigDataCloud...');
       const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
+      console.log('📍 BigDataCloud response:', data);
 
-      if (data && data.display_name) {
-        // Show the raw address as received from the API
-        return ` ${data.display_name}`;
-      }
+      if (data && data.city) {
+        const addressParts = [];
 
-      // Fallback: Try using BigDataCloud API (free, no API key required)
-      const fallbackUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude.toFixed(
-        6
-      )}&longitude=${longitude.toFixed(6)}&localityLanguage=en`;
+        // Add city/town/village
+        if (data.city) addressParts.push(data.city);
+        else if (data.town) addressParts.push(data.town);
+        else if (data.village) addressParts.push(data.village);
+        else if (data.locality) addressParts.push(data.locality);
 
-      try {
-        const fallbackResponse = await fetch(fallbackUrl);
-        const fallbackData = await fallbackResponse.json();
+        // Add state/province
+        if (data.principalSubdivision)
+          addressParts.push(data.principalSubdivision);
 
-        if (fallbackData && fallbackData.locality) {
-          // Show the raw address data
-          const rawAddress = `${fallbackData.locality}, ${fallbackData.city}, ${fallbackData.countryName}`;
-          return ` ${rawAddress}`;
+        // Add country
+        if (data.countryName) addressParts.push(data.countryName);
+
+        if (addressParts.length > 0) {
+          const address = addressParts.join(', ');
+          console.log('📍 Generated address:', address);
+          return address;
         }
-      } catch (fallbackError) {
-        console.error('Fallback geocoding failed:', fallbackError);
       }
 
-      // Second fallback: Try using Positionstack API (free tier available)
-      const secondFallbackUrl = `http://api.positionstack.com/v1/reverse?access_key=YOUR_POSITIONSTACK_KEY&query=${latitude.toFixed(
-        6
-      )},${longitude.toFixed(6)}`;
-
-      try {
-        const secondFallbackResponse = await fetch(secondFallbackUrl);
-        const secondFallbackData = await secondFallbackResponse.json();
-
-        if (secondFallbackData.data && secondFallbackData.data.length > 0) {
-          const result = secondFallbackData.data[0];
-          return ` ${result.label || result.name}`;
-        }
-      } catch (secondFallbackError) {
-        console.error('Second fallback geocoding failed:', secondFallbackError);
+      // If no city found, try to get at least country
+      if (data && data.countryName) {
+        const fallbackAddress = data.countryName;
+        console.log('📍 Fallback to country:', fallbackAddress);
+        return fallbackAddress;
       }
 
-      // Final fallback: Return coordinates with a more user-friendly format
-      return ` Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+      // Last resort: return a formatted coordinate
+      const coordAddress = `Location (${latitude.toFixed(
+        4
+      )}, ${longitude.toFixed(4)})`;
+      console.log('📍 Using coordinates as address:', coordAddress);
+      return coordAddress;
     } catch (error) {
-      console.error('Error getting address:', error);
-      return ` Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+      console.error('❌ Error getting address:', error);
+
+      // Return a more user-friendly coordinate format
+      const coordAddress = `Location (${latitude.toFixed(
+        4
+      )}, ${longitude.toFixed(4)})`;
+      console.log('📍 Error fallback address:', coordAddress);
+      return coordAddress;
+    } finally {
+      setIsLoadingAddress(false);
     }
   };
 
-  // Helper: Detect stops from GPS data
   const detectStops = (points: GPSPoint[]): DetectedStop[] => {
     const stops: DetectedStop[] = [];
     let currentStop: DetectedStop | null = null;
@@ -390,47 +407,49 @@ export default function ConductorTrackingScreen() {
         currentPoint.longitude
       );
 
-      // If distance is less than 50 meters, consider it a potential stop
-      if (distance < 50) {
+      const timeDiff = (currentPoint.timestamp - prevPoint.timestamp) / 1000; // seconds
+
+      // If vehicle is stationary (less than 50 meters in 5 minutes)
+      if (distance < 50 && timeDiff > STOP_MIN_DURATION_SECONDS) {
         if (!currentStop) {
           currentStop = {
-      id: Date.now().toString(),
-            latitude: currentPoint.latitude,
-            longitude: currentPoint.longitude,
-            placeName: `Stop ${stops.length + 1}`,
+            id: `stop_${prevPoint.timestamp}`,
+            latitude: prevPoint.latitude,
+            longitude: prevPoint.longitude,
+            placeName: 'Unknown Location',
             startTime: prevPoint.timestamp,
             endTime: currentPoint.timestamp,
-            duration: 0,
+            duration: Math.round(timeDiff / 60), // minutes
           };
         } else {
           currentStop.endTime = currentPoint.timestamp;
+          currentStop.duration = Math.round(
+            (currentPoint.timestamp - currentStop.startTime) / 60000
+          );
         }
       } else {
         if (currentStop) {
-          const duration =
-            (currentStop.endTime - currentStop.startTime) / (1000 * 60); // minutes
-          if (duration >= 5) {
-            // Only count stops longer than 5 minutes
-            currentStop.duration = duration;
-            stops.push(currentStop);
-          }
+          stops.push(currentStop);
           currentStop = null;
         }
       }
     }
 
+    if (currentStop) {
+      stops.push(currentStop);
+    }
+
     return stops;
   };
 
-  // Helper: Calculate trip analytics
   const calculateTripAnalytics = (
     points: GPSPoint[],
     stops: DetectedStop[]
   ): TripAnalytics => {
     if (points.length < 2) {
       return {
-        startTime: Date.now(),
-        endTime: Date.now(),
+        startTime: 0,
+        endTime: 0,
         totalDistance: 0,
         averageSpeed: 0,
         maxSpeed: 0,
@@ -442,6 +461,8 @@ export default function ConductorTrackingScreen() {
       };
     }
 
+    const startTime = points[0].timestamp;
+    const endTime = points[points.length - 1].timestamp;
     let totalDistance = 0;
     let maxSpeed = 0;
     const speeds: number[] = [];
@@ -457,42 +478,37 @@ export default function ConductorTrackingScreen() {
 
       const speed = calculateSpeed(points[i - 1], points[i]);
       speeds.push(speed);
-      if (speed > maxSpeed) maxSpeed = speed;
+      if (speed > maxSpeed) {
+        maxSpeed = speed;
+      }
     }
 
     const averageSpeed =
       speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
-    const totalStopTime = stops.reduce((sum, stop) => sum + stop.duration, 0);
-    const totalDuration =
-      (points[points.length - 1].timestamp - points[0].timestamp) / (1000 * 60); // minutes
+    const totalStopTime = stops.reduce(
+      (total, stop) => total + stop.duration,
+      0
+    );
     const routeEfficiency =
-      totalDuration > 0
-        ? ((totalDuration - totalStopTime) / totalDuration) * 100
-        : 0;
+      ((endTime - startTime - totalStopTime * 60000) / (endTime - startTime)) *
+      100;
 
     const alerts: string[] = [];
     const recommendations: string[] = [];
 
-    if (averageSpeed < 30) {
-      alerts.push('Average speed is below recommended threshold (30 km/h)');
-    }
     if (maxSpeed > 80) {
-      alerts.push('Maximum speed exceeded recommended limit (80 km/h)');
-    }
-    if (totalStopTime > totalDuration * 0.3) {
-      alerts.push('Excessive stop time detected');
+      alerts.push('High speed detected');
+      recommendations.push('Maintain safe speed limits');
     }
 
-    if (averageSpeed < 30) {
-      recommendations.push('Consider optimizing route for better speed');
-    }
-    if (stops.length > 10) {
-      recommendations.push('Too many stops detected - review route efficiency');
+    if (totalStopTime > 30) {
+      alerts.push('Excessive stop time');
+      recommendations.push('Minimize unnecessary stops');
     }
 
     return {
-      startTime: points[0].timestamp,
-      endTime: points[points.length - 1].timestamp,
+      startTime,
+      endTime,
       totalDistance,
       averageSpeed,
       maxSpeed,
@@ -504,203 +520,153 @@ export default function ConductorTrackingScreen() {
     };
   };
 
-  // Helper: Start GPS tracking
   const startGPSTracking = () => {
     console.log('🔄 Starting GPS tracking...');
-    console.log('   GPS Interval:', GPS_INTERVAL_SECONDS, 'seconds');
-    console.log('   Selected Trip:', selectedTrip?.trip_id);
-    console.log('   Trip Started:', tripStarted);
-    console.log('   Tracking:', tracking);
 
-    if (intervalRef.current) {
-      console.log('🔄 Clearing existing interval...');
-      clearInterval(intervalRef.current);
+    if (!selectedTrip) {
+      console.log('❌ No selected trip for GPS tracking');
+      return;
     }
 
-    intervalRef.current = setInterval(async () => {
-      const newCount = gpsIntervalCount + 1;
-      setGpsIntervalCount(newCount);
-      console.log(
-        '⏰ GPS tracking interval triggered... (Count:',
-        newCount,
-        ')'
-      );
-      console.log('   Selected Trip:', selectedTrip?.trip_id);
-      console.log('   Trip Started:', tripStarted);
-      console.log('   Is Mounted:', isMounted.current);
-      console.log('   Interval ID:', intervalRef.current);
+    if (tracking) {
+      console.log('⚠️ GPS tracking already active');
+      return;
+    }
 
+    setTracking(true);
+    console.log('✅ Tracking state set to true');
+
+    // Start GPS tracking interval
+    intervalRef.current = setInterval(async () => {
       try {
-        console.log('📍 Getting current location...');
-        const loc = await Location.getCurrentPositionAsync({
+        console.log(
+          '⏰ GPS tracking interval triggered... (Count:',
+          gpsPoints.length + 1,
+          ')'
+        );
+
+        const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
-        console.log('📍 Location obtained:', {
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          timestamp: loc.timestamp,
-        });
 
-        if (!isMounted.current) {
-          console.log('❌ Component not mounted, skipping GPS update');
-          return;
-        }
-
-        const newPoint: GPSPoint = {
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          timestamp: loc.timestamp,
-          accuracy: loc.coords.accuracy || 0,
+        const gpsPoint: GPSPoint = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          timestamp: location.timestamp,
+          accuracy: location.coords.accuracy || 0,
         };
 
-        console.log('📍 New GPS point created:', newPoint);
-        setGpsPoints((prev) => [...prev, newPoint]);
-        setLocation(loc.coords);
+        console.log('📍 GPS Point collected:', gpsPoint);
 
-        // Get address for display
-        console.log('📍 Getting address from coordinates...');
+        // Store GPS data
+        await storeGPSData(gpsPoint);
+
+        // Update current location for display
+        setLocation(location.coords);
         const address = await getAddressFromCoords(
-          loc.coords.latitude,
-          loc.coords.longitude
+          location.coords.latitude,
+          location.coords.longitude
         );
         setCurrentAddress(address);
-        console.log('📍 Address obtained:', address);
 
-        // Update conductor location in trips table every 10 seconds
-        console.log('📍 Checking conditions for backend update...');
-        console.log('   Selected Trip exists:', !!selectedTrip);
-        console.log('   Trip Started:', tripStarted);
-
-        if (selectedTrip && tripStartedRef.current) {
-          console.log('✅ Conditions met, updating backend...');
-          try {
-            console.log('📍 Updating conductor location in trips table...');
-            console.log('   Trip ID:', selectedTrip.trip_id);
-            console.log(
-              '   Coordinates:',
-              `${loc.coords.latitude}, ${loc.coords.longitude}`
-            );
-            console.log('   Address:', address);
-            console.log('   Timestamp:', new Date().toISOString());
-
-            // Update trip location using updateTrip API
-            await updateTrip(selectedTrip.trip_id, {
-              latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
-              address: address,
-            });
-            console.log('✅ Driver location updated successfully');
-
-            // Also store GPS data in trips table every 10 seconds
-            console.log(
-              `🚀 Sending GPS data to backend for trip ${selectedTrip.trip_id}:`,
-              newPoint
-            );
-            await storeGPSData(newPoint);
-          } catch (error) {
-            console.error('❌ Failed to update location in backend:', error);
-          }
-        } else {
-          console.log('❌ Conditions not met for backend update:');
-          console.log('   Selected Trip:', selectedTrip?.trip_id);
-          console.log('   Trip Started:', tripStarted);
-        }
-      } catch (error) {
+        console.log('✅ GPS tracking cycle completed');
+      } catch (error: any) {
         console.error('❌ GPS tracking error:', error);
+        setLocationError(error?.message || 'Failed to get location');
       }
     }, GPS_INTERVAL_SECONDS * 1000);
 
     console.log('✅ GPS tracking interval set successfully');
   };
 
-  // Helper: Stop GPS tracking and analyze trip
   const stopGPSTracking = () => {
+    console.log('🛑 Stopping GPS tracking...');
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
 
-    // Detect stops and calculate analytics
-    const stops = detectStops(gpsPoints);
-    setDetectedStops(stops);
+    setTracking(false);
+    console.log('✅ GPS tracking stopped');
 
-    const analytics = calculateTripAnalytics(gpsPoints, stops);
-    setTripAnalytics(analytics);
-    setShowAnalytics(true);
+    // Calculate final analytics
+    if (gpsPoints.length > 1) {
+      const analytics = calculateTripAnalytics(gpsPoints, detectedStops);
+      setTripAnalytics(analytics);
+      setShowAnalytics(true);
+    }
   };
 
-  // Helper: Get current location for adding stops
   const getCurrentLocation = async () => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setLocationError('Location permission not granted');
-        Alert.alert('Permission Error', 'Location permission not granted');
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      setLocation(location.coords);
+      const address = await getAddressFromCoords(
+        location.coords.latitude,
+        location.coords.longitude
+      );
+      setCurrentAddress(address);
+
+      // Update new stop coordinates
       setNewStop((prev) => ({
         ...prev,
-        latitude: loc.coords.latitude.toString(),
-        longitude: loc.coords.longitude.toString(),
+        latitude: location.coords.latitude.toString(),
+        longitude: location.coords.longitude.toString(),
       }));
-      setLocationError(null);
     } catch (error: any) {
-      setLocationError(error.message || 'Failed to get location');
-      Alert.alert('Location Error', error.message || 'Failed to get location');
+      console.error('Error getting current location:', error);
+      Alert.alert('Error', 'Failed to get current location');
     }
   };
 
-  // Helper: Add a new stop
   const addStop = () => {
-    const lat = parseFloat(newStop.latitude);
-    const lng = parseFloat(newStop.longitude);
-    if (newStop.name && !isNaN(lat) && !isNaN(lng)) {
-      const stop: Stop = {
-        id: Date.now().toString(),
-        name: newStop.name,
-        latitude: lat,
-        longitude: lng,
-        status: 'pending',
-        requiredWaitTime: 5,
-      };
-      setTripStops((prev) => [...prev, stop]);
-      setNewStop({ name: '', latitude: '', longitude: '' });
-      setShowAddStopModal(false);
-    } else {
-      Alert.alert(
-        'Invalid Input',
-        'Please enter a valid name, latitude, and longitude.'
-      );
+    if (!newStop.name || !newStop.latitude || !newStop.longitude) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
     }
+
+    const stop: Stop = {
+      id: Date.now().toString(),
+      name: newStop.name,
+      latitude: parseFloat(newStop.latitude),
+      longitude: parseFloat(newStop.longitude),
+      status: 'pending',
+      requiredWaitTime: 5, // Default 5 minutes
+    };
+
+    setTripStops((prev) => [...prev, stop]);
+    setShowAddStopModal(false);
+    setNewStop({ name: '', latitude: '', longitude: '' });
   };
 
-  // Helper: Load offline data
   const loadOfflineData = async () => {
     try {
-      const savedTripStops = await AsyncStorage.getItem(
-        STORAGE_KEYS.TRIP_STOPS
-      );
-      const savedGpsPoints = await AsyncStorage.getItem(
+      const storedStops = await AsyncStorage.getItem(STORAGE_KEYS.TRIP_STOPS);
+      const storedGpsPoints = await AsyncStorage.getItem(
         STORAGE_KEYS.GPS_POINTS
       );
-      const savedTripStarted = await AsyncStorage.getItem(
+      const storedTripStarted = await AsyncStorage.getItem(
         STORAGE_KEYS.TRIP_STARTED
       );
-      const savedDetectedStops = await AsyncStorage.getItem(
-        STORAGE_KEYS.DETECTED_STOPS
-      );
 
-      if (savedTripStops) setTripStops(JSON.parse(savedTripStops));
-      if (savedGpsPoints) setGpsPoints(JSON.parse(savedGpsPoints));
-      if (savedTripStarted) setTripStarted(JSON.parse(savedTripStarted));
-      if (savedDetectedStops) setDetectedStops(JSON.parse(savedDetectedStops));
+      if (storedStops) {
+        setTripStops(JSON.parse(storedStops));
+      }
+      if (storedGpsPoints) {
+        setGpsPoints(JSON.parse(storedGpsPoints));
+      }
+      if (storedTripStarted) {
+        setTripStarted(JSON.parse(storedTripStarted));
+      }
     } catch (error) {
-      console.log('Failed to load offline data:', error);
+      console.error('Error loading offline data:', error);
     }
   };
 
-  // Helper: Save offline data
   const saveOfflineData = async () => {
     try {
       await AsyncStorage.setItem(
@@ -715,182 +681,108 @@ export default function ConductorTrackingScreen() {
         STORAGE_KEYS.TRIP_STARTED,
         JSON.stringify(tripStarted)
       );
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.DETECTED_STOPS,
-        JSON.stringify(detectedStops)
-      );
     } catch (error) {
-      console.log('Failed to save offline data:', error);
+      console.error('Error saving offline data:', error);
     }
   };
 
-  // Helper: Start trip
   const startTrip = async () => {
     if (!selectedTrip) {
-      Alert.alert('Error', 'No trip selected. Please select a trip first.');
-        return;
-      }
-
-    const granted = await requestLocationPermissions();
-    if (!granted) return;
+      Alert.alert('Error', 'No trip selected');
+      return;
+    }
 
     try {
-      // Update trip status to in_progress
-      await updateTrip(selectedTrip.trip_id, { trip_status: 'in_progress' });
-
       setTripStarted(true);
-      setTracking(true);
       startGPSTracking();
+
       Alert.alert(
         'Trip Started',
         'GPS tracking has begun. Your location will be recorded every 10 seconds and stored in the database.'
       );
     } catch (error: any) {
       console.error('Error starting trip:', error);
-      Alert.alert('Error', 'Failed to start trip. Please try again.');
+      Alert.alert('Error', 'Failed to start trip');
     }
   };
 
-  // Helper: End trip
   const endTrip = async () => {
-    if (!selectedTrip) return;
+    if (!selectedTrip) {
+      Alert.alert('Error', 'No trip selected');
+      return;
+    }
 
     try {
-      console.log('🛑 Ending trip...');
-      console.log('   Trip ID:', selectedTrip.trip_id);
-      console.log('   Total GPS Points:', gpsPoints.length);
-
-      // GPS data is already being stored every 10 seconds in the trips table
-      // No need to store it again here since it's already updated in real-time
-      if (gpsPoints.length > 0) {
-        console.log(
-          '📊 GPS data has been continuously updated in trips table during the trip'
-        );
-        console.log('   Final GPS point count:', gpsPoints.length);
-      }
-
-      // Update trip status to completed
-      console.log('🛑 Calling API to update trip status to completed...');
-      console.log('   Trip ID:', selectedTrip.trip_id);
-
-      const statusUpdateResult = await updateTrip(selectedTrip.trip_id, {
-        trip_status: 'completed'
-      });
-      console.log('✅ Trip status update API response:', statusUpdateResult);
-
-      // Update local state to reflect completed status
-      setSelectedTrip((prev) =>
-        prev ? { ...prev, trip_status: 'completed' } : null
-      );
-      setAllConductorTrips((prev) =>
-        prev.filter((trip) => trip.trip_id !== selectedTrip.trip_id)
-      );
-
       stopGPSTracking();
       setTripStarted(false);
-      setTracking(false);
+
+      // Update trip status to completed
+      await updateTrip(selectedTrip.trip_id, {
+        trip_status: 'completed',
+      });
 
       Alert.alert(
         'Trip Ended',
-        'Trip completed successfully. All GPS data has been stored for analysis.'
+        'Trip has been completed and GPS tracking has stopped.'
       );
+
+      // Reload trips to update the list
+      loadConductorTrips();
     } catch (error: any) {
       console.error('Error ending trip:', error);
-      Alert.alert('Error', 'Failed to end trip. Please try again.');
+      Alert.alert('Error', 'Failed to end trip');
     }
   };
 
-  // Helper: Get status color
   function getStatusColor(status?: StopStatus) {
     switch (status) {
-      case 'pending':
-        return '#D1D5DB';
       case 'reached':
-        return '#DC2626';
-      case 'completed':
         return '#10B981';
+      case 'completed':
+        return '#3B82F6';
       case 'overdue':
         return '#EF4444';
       default:
-        return '#D1D5DB';
+        return '#F59E0B';
     }
   }
 
-  // Helper: Get trip status color
   function getTripStatusColor(status: string) {
     switch (status) {
-      case 'pending':
-        return '#FEF3C7';
-      case 'scheduled':
-        return '#D1FAE5';
       case 'in_progress':
-        return '#DBEAFE';
+        return '#10B981';
       case 'completed':
-        return '#F3F4F6';
+        return '#3B82F6';
       case 'cancelled':
-        return '#FEE2E2';
+        return '#EF4444';
       default:
-        return '#F3F4F6';
+        return '#F59E0B';
     }
   }
 
-  // Helper: Handle start trip
   const handleStartTrip = async (trip: APITrip) => {
-    try {
-      console.log('🚀 Starting new trip...');
-      console.log('   Trip ID:', trip.trip_id);
-      console.log('   Vehicle ID:', trip.vehicle_id);
+    setSelectedTrip(trip);
+    setTripStarted(true);
+    startGPSTracking();
 
-      // Update trip status to in_progress
-      await updateTrip(trip.trip_id, { trip_status: 'in_progress' });
-
-      // Update local state
-      setAllConductorTrips((prev) =>
-        prev.map((t) =>
-          t.trip_id === trip.trip_id ? { ...t, trip_status: 'in_progress' } : t
-        )
-      );
-
-      // Clear previous GPS data and set as selected trip
-      console.log('🔄 Setting up GPS tracking...');
-      console.log('   Previous tripStarted:', tripStarted);
-      console.log('   Previous tracking:', tracking);
-      setGpsPoints([]);
-      setSelectedTrip(trip);
-      setTripStarted(true);
-      setTracking(true);
-      console.log('🔄 Starting GPS tracking function...');
-      startGPSTracking();
-      console.log('🔄 GPS tracking setup complete');
-      console.log('   New tripStarted should be: true');
-      console.log('   New tracking should be: true');
-
-      console.log('✅ Trip started successfully');
-      Alert.alert(
-        'Trip Started',
-        'GPS tracking has begun. Your location will be updated every 10 seconds.'
-      );
-    } catch (error: any) {
-      console.error('Error starting trip:', error);
-      Alert.alert('Error', 'Failed to start trip. Please try again.');
-    }
+    Alert.alert(
+      'Trip Started',
+      'GPS tracking has begun. Your location will be updated every 10 seconds.'
+    );
   };
 
-  // Helper: Handle start GPS tracking for in-progress trip
   const handleStartGPSTracking = async (trip: APITrip) => {
     try {
       console.log('🚀 Starting GPS tracking for in-progress trip...');
       console.log('   Trip ID:', trip.trip_id);
-      console.log('   Vehicle ID:', trip.vehicle_id);
+      console.log('   Trip Status:', trip.trip_status);
 
-      // Clear previous GPS data and set as selected trip
-      setGpsPoints([]);
       setSelectedTrip(trip);
       setTripStarted(true);
-      setTracking(true);
       startGPSTracking();
 
       console.log('✅ GPS tracking started successfully');
+
       Alert.alert(
         'GPS Tracking Started',
         'GPS tracking has begun. Your location will be updated every 10 seconds.'
@@ -901,95 +793,75 @@ export default function ConductorTrackingScreen() {
     }
   };
 
-  // Load offline data on mount
-  useEffect(() => {
-    loadOfflineData();
-  }, []);
-
-  // Save offline data when relevant state changes
-  useEffect(() => {
-    saveOfflineData();
-  }, [tripStops, gpsPoints, tripStarted, detectedStops]);
-
-  // Check network status periodically
+  // Network status check
   useEffect(() => {
     const checkNetworkStatus = () => setIsOnline(true);
     checkNetworkStatus();
-    const interval = setInterval(checkNetworkStatus, 30000);
-    return () => clearInterval(interval);
   }, []);
 
-  // Initial location check
+  // Check permissions and location on mount
   useEffect(() => {
-    let cancelled = false;
     async function checkPermissionsAndLocation() {
       try {
-        const granted = await requestLocationPermissions();
-        if (cancelled) return;
-        if (granted) {
-          try {
-            const loc = await Location.getCurrentPositionAsync({});
-            if (cancelled) return;
-            setLocation(loc.coords);
-            setLocationError(null);
-
-            // Get initial address
-            const address = await getAddressFromCoords(
-              loc.coords.latitude,
-              loc.coords.longitude
-            );
-            setCurrentAddress(address);
-          } catch (e) {
-            if (cancelled) return;
-            setLocationError('Failed to get location');
-            setPermissionError('Failed to get location');
-          }
+        const hasPermission = await requestLocationPermissions();
+        if (hasPermission) {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+          setLocation(location.coords);
+          const address = await getAddressFromCoords(
+            location.coords.latitude,
+            location.coords.longitude
+          );
+          setCurrentAddress(address);
         } else {
-          if (cancelled) return;
-          setLocationError('Location permission not granted');
-          setPermissionError('Location permission not granted');
+          setPermissionError('Location permission denied');
         }
-      } catch (error) {
-        if (cancelled) return;
-        setPermissionError('Failed to request permissions');
+      } catch (error: any) {
+        console.error('Error checking permissions:', error);
+        setLocationError(error?.message || 'Failed to get location');
       }
     }
+
     checkPermissionsAndLocation();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  // Error banner component
   const ErrorBanner = () => {
     if (!permissionError && !locationError) return null;
+
     return (
-      <View
-        style={{
-          backgroundColor: '#FECACA',
-          padding: 10,
-          alignItems: 'center',
-        }}
-      >
-        <Text style={{ color: '#B91C1C', fontWeight: 'bold' }}>
-          {permissionError || locationError}
-        </Text>
+      <View style={styles.errorBanner}>
+        <AlertCircle size={16} color="#FFFFFF" />
+        <Text style={styles.errorText}>{permissionError || locationError}</Text>
       </View>
     );
   };
 
-  // After: const [tripStarted, setTripStarted] = useState(false);
-  const tripStartedRef = useRef(tripStarted);
-  useEffect(() => {
-    tripStartedRef.current = tripStarted;
-  }, [tripStarted]);
+  // Monitoring functions
+  const handleEnableMonitoring = () => {
+    if (!cameraWifiUrl.trim()) {
+      Alert.alert('Error', 'Please enter the camera WiFi URL');
+      return;
+    }
+    setMonitoringEnabled(true);
+    setShowMonitoringModal(false);
+    Alert.alert('Success', 'Camera monitoring has been enabled');
+  };
 
-  const { t, language } = useLanguage();
+  const handleConnectOBD = () => {
+    if (!obdDeviceName.trim()) {
+      Alert.alert('Error', 'Please enter the OBD device name');
+      return;
+    }
+    setObdConnected(true);
+    setShowObdModal(false);
+    Alert.alert('Success', 'OBD device connected successfully');
+  };
 
   if (loading) {
-  return (
-    <View style={styles.container}>
-      <ErrorBanner />
+    return (
+      <View style={styles.container}>
+        <Navbar title="Trip Tracking" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#DC2626" />
           <Text style={styles.loadingText}>Loading trip information...</Text>
@@ -1000,37 +872,25 @@ export default function ConductorTrackingScreen() {
 
   return (
     <View style={styles.container}>
+      <Navbar title="Trip Tracking" />
       <ErrorBanner />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Trip Tracking</Text>
-        <Text style={styles.headerSubtitle}>
-          {selectedTrip ? t('trip_number').replace('{id}', String(selectedTrip.trip_id)) : t('no_active_trip')}
-        </Text>
-        <View
-          style={[
-            styles.networkStatus,
-            { backgroundColor: isOnline ? '#10B981' : '#EF4444' },
-          ]}
-        >
-          <Text style={styles.networkStatusText}>
-            {isOnline ? '🟢 Online' : '🔴 Offline'}
-          </Text>
-        </View>
-      </View>
 
       <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
         {/* In-Progress Trips Section */}
-        <View style={styles.tripsListContainer}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>📋 My In-Progress Trips</Text>
           {allConductorTrips.length === 0 ? (
-            <View style={styles.noTripsContainer}>
-              <Text style={styles.noTripsText}>{t('no_in_progress_trips')}</Text>
-              <Text style={styles.noTripsSubtext}>{t('no_in_progress_trips_subtext')}</Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {t('no_in_progress_trips') || 'No in-progress trips'}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {t('no_in_progress_trips_subtext') ||
+                  'You have no active trips assigned'}
+              </Text>
             </View>
           ) : (
             allConductorTrips.map((trip) => (
@@ -1044,34 +904,34 @@ export default function ConductorTrackingScreen() {
                 <View style={styles.tripCardHeader}>
                   <View style={styles.tripCardInfo}>
                     <Text style={styles.tripCardRoute}>
-                      {t('city_' + trip.start_location)} → {t('city_' + trip.end_location)}
+                      {trip.start_location} → {trip.end_location}
                     </Text>
                     <Text style={styles.tripCardVehicle}>
-                      {t('vehicle')}: {trip.vehicle_number || t('na')}
+                      Vehicle ID: {trip.vehicle_id || 'N/A'}
                     </Text>
                     <Text style={styles.tripCardTime}>
-                      {new Date(trip.start_time).toLocaleString(language === 'ta' ? 'ta-IN' : 'en-IN')}
+                      {new Date(trip.start_time).toLocaleString()}
                     </Text>
                   </View>
                   <View
-                  style={[
+                    style={[
                       styles.tripStatusBadge,
                       { backgroundColor: getTripStatusColor(trip.trip_status) },
-                  ]}
-                >
+                    ]}
+                  >
                     <Text style={styles.tripStatusText}>
-                      {t('trip_status_' + trip.trip_status)}
-                </Text>
+                      {trip.trip_status}
+                    </Text>
                   </View>
                 </View>
 
                 {trip.trip_status === 'in_progress' && !tripStarted && (
-              <TouchableOpacity
+                  <TouchableOpacity
                     style={styles.startGPSTrackingButton}
                     onPress={() => handleStartGPSTracking(trip)}
                   >
                     <Text style={styles.startGPSTrackingButtonText}>
-                      🚀 {t('start_gps_tracking')}
+                      🚀 Start GPS Tracking
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -1079,7 +939,7 @@ export default function ConductorTrackingScreen() {
                 {trip.trip_status === 'in_progress' && tripStarted && (
                   <View style={styles.activeTripIndicator}>
                     <Text style={styles.activeTripText}>
-                      🟢 {t('gps_tracking_active')}
+                      🟢 GPS Tracking Active
                     </Text>
                   </View>
                 )}
@@ -1088,96 +948,25 @@ export default function ConductorTrackingScreen() {
           )}
         </View>
 
-        {/* Trip Details Section */}
-        {selectedTrip ? (
-          <View style={styles.tripDetailsContainer}>
-            <Text style={styles.sectionTitle}>🚌 Trip Details</Text>
-            <View style={styles.tripInfo}>
-              <View style={styles.tripRoute}>
-                <Text style={styles.tripRouteLabel}>Route:</Text>
-                <Text style={styles.tripRouteValue}>
-                  {t('city_' + selectedTrip.start_location)} → {t('city_' + selectedTrip.end_location)}
-                </Text>
-              </View>
-
-              <View style={styles.tripDetailsRow}>
-                <View style={styles.tripDetailItem}>
-                  <Text style={styles.tripDetailLabel}>Vehicle:</Text>
-                  <Text style={styles.tripDetailValue}>
-                    {selectedTrip.vehicle_number || t('na')}
-                  </Text>
-                </View>
-
-                <View style={styles.tripDetailItem}>
-                  <Text style={styles.tripDetailLabel}>Status:</Text>
-                <Text
-                  style={[
-                      styles.tripDetailValue,
-                      {
-                        color:
-                          selectedTrip.trip_status === 'in_progress'
-                            ? '#10B981'
-                            : '#F59E0B',
-                      },
-                    ]}
-                  >
-                    {t('trip_status_' + selectedTrip.trip_status)}
-                </Text>
-                </View>
-              </View>
-
-              <View style={styles.tripDetailsRow}>
-                <View style={styles.tripDetailItem}>
-                  <Text style={styles.tripDetailLabel}>Start Time:</Text>
-                  <Text style={styles.tripDetailValue}>
-                    {new Date(selectedTrip.start_time).toLocaleString(language === 'ta' ? 'ta-IN' : 'en-IN')}
-                </Text>
-            </View>
-
-                {selectedTrip.driver_first_name && (
-                  <View style={styles.tripDetailItem}>
-                    <Text style={styles.tripDetailLabel}>Driver:</Text>
-                    <Text style={styles.tripDetailValue}>
-                      {selectedTrip.driver_first_name}{' '}
-                      {selectedTrip.driver_last_name}
-                    </Text>
-          </View>
-        )}
-              </View>
-
-              {selectedTrip.distance_travelled && (
-                <View style={styles.tripDetailsRow}>
-                  <View style={styles.tripDetailItem}>
-                    <Text style={styles.tripDetailLabel}>Distance:</Text>
-                    <Text style={styles.tripDetailValue}>
-                      {selectedTrip.distance_travelled} km
-              </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.noTripContainer}>
-            <Text style={styles.noTripTitle}>{t('no_active_trip')}</Text>
-            <Text style={styles.noTripSubtext}>{t('no_active_trip_subtext')}</Text>
-            <TouchableOpacity
-              style={styles.refreshTripButton}
-              onPress={loadConductorTrips}
-            >
-              <Text style={styles.refreshTripButtonText}>{t('refresh_trips')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Current Location Section */}
-        <View style={styles.locationContainer}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>📍 Current Location</Text>
           {location ? (
             <View style={styles.locationInfo}>
               <View style={styles.addressContainer}>
                 <Text style={styles.addressLabel}>📍 Current Address:</Text>
-                <Text style={styles.addressValue}>{currentAddress}</Text>
+                {isLoadingAddress ? (
+                  <View style={styles.loadingAddressContainer}>
+                    <ActivityIndicator size="small" color="#0369A1" />
+                    <Text style={styles.loadingAddressText}>
+                      Getting address...
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.addressValue}>
+                    {currentAddress || 'Address not available'}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.coordinatesContainer}>
@@ -1185,260 +974,156 @@ export default function ConductorTrackingScreen() {
                 <Text style={styles.locationValue}>
                   {location.latitude.toFixed(6)},{' '}
                   {location.longitude.toFixed(6)}
-              </Text>
+                </Text>
               </View>
 
               <TouchableOpacity
                 style={styles.refreshButton}
                 onPress={getCurrentLocation}
+                disabled={isLoadingAddress}
               >
                 <Text style={styles.refreshButtonText}>
-                  🔄 {t('refresh_location')}
+                  {isLoadingAddress
+                    ? '⏳ Getting Address...'
+                    : '🔄 Refresh Location'}
                 </Text>
+              </TouchableOpacity>
+
+              {/* Test button for debugging */}
+              <TouchableOpacity
+                style={[
+                  styles.refreshButton,
+                  { marginTop: 8, backgroundColor: '#F59E0B' },
+                ]}
+                onPress={async () => {
+                  console.log('🧪 Testing address function...');
+                  if (location) {
+                    const testAddress = await getAddressFromCoords(
+                      location.latitude,
+                      location.longitude
+                    );
+                    console.log('🧪 Test result:', testAddress);
+                    setCurrentAddress(testAddress);
+                  } else {
+                    console.log('🧪 No location available for test');
+                  }
+                }}
+              >
+                <Text style={styles.refreshButtonText}>🧪 Test Address</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.locationPlaceholder}>
-              <Text style={styles.locationText}>{t('getting_location')}</Text>
-              <ActivityIndicator
-                size="large"
-                color="#DC2626"
-                style={{ marginTop: 10 }}
-              />
+            <View style={styles.noLocationContainer}>
+              <Text style={styles.noLocationText}>Location not available</Text>
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={getCurrentLocation}
+              >
+                <Text style={styles.refreshButtonText}>🔄 Get Location</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Trip Status */}
-        {selectedTrip && (
-          <View style={styles.statusContainer}>
-            <Text style={styles.sectionTitle}>Trip Status</Text>
-                <View style={styles.statusGrid}>
-                  <View style={styles.statusItem}>
-                <Text style={styles.statusLabel}>Status</Text>
-                    <Text style={styles.statusValue}>
-                  {tripStarted ? t('active_status') : t('inactive_status')}
-                    </Text>
-                  </View>
-                  <View style={styles.statusItem}>
-                <Text style={styles.statusLabel}>GPS Points</Text>
-                <Text style={styles.statusValue}>{gpsPoints.length}</Text>
-                  </View>
-                  <View style={styles.statusItem}>
-                <Text style={styles.statusLabel}>Interval Count</Text>
-                <Text style={styles.statusValue}>{gpsIntervalCount}</Text>
-                  </View>
-                  <View style={styles.statusItem}>
-                <Text style={styles.statusLabel}>Detected Stops</Text>
-                <Text style={styles.statusValue}>{detectedStops.length}</Text>
-                </View>
-                <View style={styles.statusItem}>
-                  <Text style={styles.statusLabel}>Duration</Text>
-                  <Text style={styles.statusValue}>
-                  {tripStarted && gpsPoints.length > 0
-                      ? `${Math.round(
-                        (Date.now() - gpsPoints[0].timestamp) / (1000 * 60)
-                        )} min`
-                      : '0 min'}
-                  </Text>
-                </View>
-                </View>
-          </View>
-        )}
-
-        {/* Trip Analytics */}
-        {showAnalytics && tripAnalytics && (
-          <View style={styles.analyticsContainer}>
-            <Text style={styles.sectionTitle}>Trip Analytics</Text>
-            <View style={styles.analyticsGrid}>
-              <View style={styles.analyticsItem}>
-                <Text style={styles.analyticsLabel}>Total Distance</Text>
-                <Text style={styles.analyticsValue}>
-                  {(tripAnalytics.totalDistance / 1000).toFixed(2)} km
-                </Text>
+        {/* Monitoring Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📹 Camera Monitoring</Text>
+          <View style={styles.monitoringCard}>
+            <View style={styles.monitoringHeader}>
+              <Video
+                size={24}
+                color={monitoringEnabled ? '#10B981' : '#6B7280'}
+              />
+              <Text style={styles.monitoringTitle}>
+                {monitoringEnabled
+                  ? 'Monitoring Active'
+                  : 'Monitoring Disabled'}
+              </Text>
             </View>
-              <View style={styles.analyticsItem}>
-                <Text style={styles.analyticsLabel}>Average Speed</Text>
-                <Text style={styles.analyticsValue}>
-                  {tripAnalytics.averageSpeed.toFixed(1)} km/h
-                  </Text>
-                </View>
-              <View style={styles.analyticsItem}>
-                <Text style={styles.analyticsLabel}>Max Speed</Text>
-                <Text style={styles.analyticsValue}>
-                  {tripAnalytics.maxSpeed.toFixed(1)} km/h
-                  </Text>
-                </View>
-              <View style={styles.analyticsItem}>
-                <Text style={styles.analyticsLabel}>Total Stops</Text>
-                <Text style={styles.analyticsValue}>
-                  {tripAnalytics.totalStops}
-                  </Text>
-                </View>
-              <View style={styles.analyticsItem}>
-                <Text style={styles.analyticsLabel}>Stop Time</Text>
-                <Text style={styles.analyticsValue}>
-                  {tripAnalytics.totalStopTime.toFixed(1)} min
-                  </Text>
-                </View>
-              <View style={styles.analyticsItem}>
-                <Text style={styles.analyticsLabel}>Efficiency</Text>
-                <Text style={styles.analyticsValue}>
-                  {tripAnalytics.routeEfficiency.toFixed(1)}%
-                        </Text>
-                      </View>
-                    </View>
 
-                    {/* Alerts */}
-            {tripAnalytics.alerts.length > 0 && (
-                      <View style={styles.alertsContainer}>
-                        <Text style={styles.alertsTitle}>⚠️ Trip Alerts</Text>
-                {tripAnalytics.alerts.map((alert, index) => (
-                          <Text key={index} style={styles.alertText}>
-                            • {alert}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
-
-                    {/* Recommendations */}
-            {tripAnalytics.recommendations.length > 0 && (
-                      <View style={styles.recommendationsContainer}>
-                        <Text style={styles.recommendationsTitle}>
-                          💡 Recommendations
-                        </Text>
-                {tripAnalytics.recommendations.map((rec, index) => (
-                          <Text key={index} style={styles.recommendationText}>
-                            • {rec}
-                          </Text>
-                        ))}
-                  </View>
-                )}
-              </View>
-            )}
-
-        {/* Detected Stops */}
-        {detectedStops.length > 0 && (
-          <View style={styles.stopsContainer}>
-            <Text style={styles.sectionTitle}>Detected Stops ({'>'}5 min)</Text>
-            {detectedStops.map((stop, index) => (
-              <View key={stop.id} style={styles.stopItem}>
-                      <View style={styles.stopInfo}>
-                        <Text style={styles.stopNumber}>{index + 1}</Text>
-                        <View style={styles.stopDetails}>
-                          <Text style={styles.stopName}>{stop.placeName}</Text>
-                          <Text style={styles.stopCoords}>
-                      {stop.latitude.toFixed(6)}, {stop.longitude.toFixed(6)}
-                    </Text>
-                    <Text style={styles.stopTime}>
-                      {new Date(stop.startTime).toLocaleTimeString()} -{' '}
-                      {new Date(stop.endTime).toLocaleTimeString()}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.stopDuration}>
-                        <Text style={styles.durationText}>
-                    {stop.duration.toFixed(1)} min
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-          </View>
-        )}
-
-        {/* Manual Stops */}
-          <View style={styles.stopsManagementContainer}>
-            <Text style={styles.sectionTitle}>Trip Stops</Text>
-            {tripStops.length === 0 ? (
-              <View style={styles.noStopsContainer}>
-                <Text style={styles.noStopsText}>{t('no_stops_added')}</Text>
-                <Text style={styles.noStopsSubtext}>{t('add_stops_to_begin_trip')}</Text>
+            {monitoringEnabled ? (
+              <View style={styles.monitoringStatus}>
+                <Text style={styles.monitoringStatusText}>
+                  Camera connected to: {cameraWifiUrl}
+                </Text>
+                <TouchableOpacity
+                  style={styles.disableButton}
+                  onPress={() => setMonitoringEnabled(false)}
+                >
+                  <Text style={styles.disableButtonText}>
+                    Disable Monitoring
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.stopsList}>
-                {tripStops.map((stop, index) => (
-                  <View key={stop.id} style={styles.stopItem}>
-                    <View style={styles.stopInfo}>
-                      <Text style={styles.stopNumber}>{index + 1}</Text>
-                      <View style={styles.stopDetails}>
-                        <Text style={styles.stopName}>{stop.name}</Text>
-                        <Text style={styles.stopCoords}>
-                        {stop.latitude.toFixed(6)}, {stop.longitude.toFixed(6)}
-                        </Text>
-                    </View>
-                  </View>
-                  <View style={styles.stopActions}>
-                    <View style={styles.stopStatus}>
-                        <View
-                        style={[
-                          styles.statusIndicator,
-                          { backgroundColor: getStatusColor(stop.status) },
-                        ]}
-                      />
-                      <Text style={styles.statusText}>{stop.status}</Text>
-                    </View>
-                    <View style={styles.actionButtons}>
-                          <TouchableOpacity
-                        style={styles.editButton}
-                        onPress={() => {
-                              setEditingStop({
-                                id: stop.id,
-                                name: stop.name,
-                                latitude: stop.latitude.toString(),
-                                longitude: stop.longitude.toString(),
-                          });
-                        }}
-                      >
-                        <Text style={styles.editButtonText}>{t('edit')}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() => {
-                          Alert.alert(
-                            'Delete Stop',
-                            `Are you sure you want to delete "${stop.name}"?`,
-                            [
-                              { text: t('cancel'), style: 'cancel' },
-                              {
-                                text: t('delete'),
-                                style: 'destructive',
-                                onPress: () => {
-                              setTripStops((prev) =>
-                                prev.filter((s) => s.id !== stop.id)
-                                  );
-                                },
-                              },
-                            ]
-                          );
-                        }}
-                      >
-                        <Text style={styles.deleteButtonText}>{t('delete')}</Text>
-                          </TouchableOpacity>
-                        </View>
-                    </View>
-                  </View>
-                ))}
+              <View style={styles.monitoringSetup}>
+                <Text style={styles.monitoringDescription}>
+                  Connect your camera to start monitoring. Enter the camera's
+                  WiFi URL to establish connection.
+                </Text>
+                <TouchableOpacity
+                  style={styles.enableButton}
+                  onPress={() => setShowMonitoringModal(true)}
+                >
+                  <Text style={styles.enableButtonText}>
+                    Setup Camera Monitoring
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
+          </View>
+        </View>
 
-              <TouchableOpacity
-            style={styles.addStopButton}
-                onPress={() => setShowAddStopModal(true)}
-              >
-                <Text style={styles.addStopButtonText}>{t('add_stop')}</Text>
-              </TouchableOpacity>
+        {/* OBD Connection Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔧 OBD Logger Connection</Text>
+          <View style={styles.obdCard}>
+            <View style={styles.obdHeader}>
+              <Bluetooth
+                size={24}
+                color={obdConnected ? '#10B981' : '#6B7280'}
+              />
+              <Text style={styles.obdTitle}>
+                {obdConnected ? 'OBD Connected' : 'OBD Disconnected'}
+              </Text>
+            </View>
+
+            {obdConnected ? (
+              <View style={styles.obdStatus}>
+                <Text style={styles.obdStatusText}>
+                  Connected to: {obdDeviceName}
+                </Text>
+                <TouchableOpacity
+                  style={styles.disconnectButton}
+                  onPress={() => setObdConnected(false)}
+                >
+                  <Text style={styles.disconnectButtonText}>
+                    Disconnect OBD
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.obdSetup}>
+                <Text style={styles.obdDescription}>
+                  Connect your OBD logger device to monitor vehicle diagnostics
+                  and performance data.
+                </Text>
+                <TouchableOpacity
+                  style={styles.connectButton}
+                  onPress={() => setShowObdModal(true)}
+                >
+                  <Text style={styles.connectButtonText}>
+                    Connect OBD Device
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Trip Controls */}
-        <View style={styles.controlsContainer}>
-          {/* Debug Info */}
-          {selectedTrip && (
-            <View style={styles.debugInfo}>
-              <Text style={styles.debugText}>
-                {t('debug_trip_status').replace('{status}', selectedTrip.trip_status).replace('{started}', tripStarted.toString())}
-              </Text>
-            </View>
-          )}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎮 Trip Controls</Text>
 
           {selectedTrip &&
             selectedTrip.trip_status === 'in_progress' &&
@@ -1447,7 +1132,7 @@ export default function ConductorTrackingScreen() {
                 style={[styles.button, styles.startButton]}
                 onPress={() => handleStartGPSTracking(selectedTrip)}
               >
-                <Text style={styles.buttonText}>🚀 {t('start_gps_tracking')}</Text>
+                <Text style={styles.buttonText}>🚀 Start GPS Tracking</Text>
               </TouchableOpacity>
             )}
 
@@ -1456,398 +1141,115 @@ export default function ConductorTrackingScreen() {
               style={[styles.button, styles.stopButton]}
               onPress={endTrip}
             >
-              <Text style={styles.buttonText}>🛑 {t('end_trip')}</Text>
+              <Text style={styles.buttonText}>🛑 End Trip</Text>
             </TouchableOpacity>
           )}
 
           <Text style={styles.trackingInfo}>
             {tripStarted
-              ? t('gps_tracking_active_info')
+              ? 'GPS tracking is currently active. Your location is being recorded.'
               : selectedTrip && selectedTrip.trip_status === 'in_progress'
-              ? t('start_gps_tracking_prompt')
-              : t('no_in_progress_trip_selected')}
+              ? 'Ready to start GPS tracking for your active trip.'
+              : 'No active trip selected.'}
           </Text>
-
-          {/* Debug Button */}
-              <TouchableOpacity
-                style={[
-              styles.button,
-              { backgroundColor: '#6B7280', marginTop: 8 },
-            ]}
-            onPress={() => {
-              console.log('🔍 Debug Info:');
-              console.log('   Selected Trip:', selectedTrip);
-              console.log('   Trip Started:', tripStarted);
-              console.log('   Tracking:', tracking);
-              console.log('   GPS Points Count:', gpsPoints.length);
-              console.log('   All Trips Count:', allConductorTrips.length);
-              console.log('   User:', user?.username);
-              console.log(
-                '   All Trips Statuses:',
-                allConductorTrips.map((t) => ({
-                  id: t.trip_id,
-                  status: t.trip_status,
-                }))
-              );
-              Alert.alert(
-                'Debug Info',
-                `Selected Trip: ${
-                  selectedTrip?.trip_id || 'None'
-                }\nTrip Started: ${tripStarted}\nTracking: ${tracking}\nGPS Points: ${
-                  gpsPoints.length
-                }\nAll Trips: ${allConductorTrips.length}`
-              );
-            }}
-          >
-            <Text style={styles.buttonText}>🔍 {t('debug_info')}</Text>
-              </TouchableOpacity>
-
-          {/* Manual GPS Test Button */}
-          {selectedTrip && (
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                { backgroundColor: '#059669', marginTop: 8 },
-              ]}
-              onPress={async () => {
-                try {
-                  console.log('�� Testing manual GPS data storage...');
-                  const loc = await Location.getCurrentPositionAsync({
-                    accuracy: Location.Accuracy.High,
-                  });
-
-                  const testPoint: GPSPoint = {
-                    latitude: loc.coords.latitude,
-                    longitude: loc.coords.longitude,
-                    timestamp: loc.timestamp,
-                    accuracy: loc.coords.accuracy || 0,
-                  };
-
-                  console.log('🧪 Test GPS Point:', testPoint);
-                  console.log('🧪 Selected Trip:', selectedTrip);
-
-                  await storeGPSData(testPoint);
-                  Alert.alert(
-                    'GPS Test',
-                    'Manual GPS data storage test completed! Check console for details.'
-                  );
-                } catch (error: any) {
-                  console.error('❌ Manual GPS test failed:', error);
-                  Alert.alert(
-                    'GPS Test Error',
-                    `Failed to test GPS data storage: ${
-                      error?.message || 'Unknown error'
-                    }`
-                  );
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>🧪 {t('test_gps_storage')}</Text>
-              </TouchableOpacity>
-          )}
-
-          {/* Reset Trip State Button */}
-              <TouchableOpacity
-                style={[
-                  styles.button,
-              { backgroundColor: '#DC2626', marginTop: 8 },
-            ]}
-            onPress={() => {
-              setTripStarted(false);
-              setTracking(false);
-              setGpsPoints([]);
-              setDetectedStops([]);
-              setTripAnalytics(null);
-              setShowAnalytics(false);
-              if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-              }
-              Alert.alert(
-                'Reset Complete',
-                'Trip state has been reset. You can now start fresh.'
-              );
-            }}
-          >
-            <Text style={styles.buttonText}>🔄 {t('reset_trip_state')}</Text>
-              </TouchableOpacity>
-
-          {/* Test Trip Creation Button */}
-              <TouchableOpacity
-                style={[
-                  styles.button,
-              { backgroundColor: '#8B5CF6', marginTop: 8 },
-            ]}
-            onPress={async () => {
-              try {
-                console.log('🧪 Creating test trip...');
-                // This would need to be implemented in your backend
-                // For now, just show what we need
-                Alert.alert(
-                  'Test Trip Info',
-                  'To test the system, you need a trip with status "in_progress" assigned to your conductor username. Check the debug info to see your current trips and their statuses.'
-                );
-              } catch (error) {
-                console.error('❌ Test trip creation failed:', error);
-                Alert.alert(
-                  'Error',
-                  'Failed to create test trip. Check console for details.'
-                );
-              }
-            }}
-          >
-            <Text style={styles.buttonText}>🧪 {t('test_trip_info')}</Text>
-              </TouchableOpacity>
-
-          {/* Test Backend GPS Storage Button */}
-              <TouchableOpacity
-                style={[
-                  styles.button,
-              { backgroundColor: '#F59E0B', marginTop: 8 },
-            ]}
-            onPress={async () => {
-              try {
-                console.log('🧪 Testing backend GPS data storage directly...');
-
-                const response = await fetch(
-                  'http://192.168.1.100:3000/api/trips/testGPSData',
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({}),
-                  }
-                );
-
-                const result = await response.json();
-                console.log('🧪 Backend test result:', result);
-
-                if (result.success) {
-                  Alert.alert(
-                    'Backend Test Success',
-                    'GPS data storage test completed successfully! Check console for details.'
-                  );
-                } else {
-                  Alert.alert(
-                    'Backend Test Failed',
-                    `Test failed: ${result.error}`
-                  );
-                }
-              } catch (error: any) {
-                console.error('❌ Backend GPS test failed:', error);
-                Alert.alert(
-                  'Backend Test Error',
-                  `Failed to test backend: ${error?.message || 'Unknown error'}`
-                );
-              }
-            }}
-          >
-            <Text style={styles.buttonText}>🧪 {t('test_backend_gps')}</Text>
-              </TouchableOpacity>
-
-          {/* Test Trip Status Update Button */}
-          {selectedTrip && (
-            <TouchableOpacity
-              style={[
-                styles.button,
-                { backgroundColor: '#8B5CF6', marginTop: 8 },
-              ]}
-              onPress={async () => {
-                try {
-                  console.log('🧪 Testing trip status update...');
-                  console.log('   Trip ID:', selectedTrip.trip_id);
-                  console.log('   Current Status:', selectedTrip.trip_status);
-
-                  const result = await updateTrip(selectedTrip.trip_id, {
-                    trip_status: 'completed'
-                  });
-                  console.log('🧪 Trip status update result:', result);
-
-                  Alert.alert(
-                    'Trip Status Test',
-                    'Trip status update test completed! Check console for details.'
-                  );
-                } catch (error: any) {
-                  console.error('❌ Trip status update test failed:', error);
-                  Alert.alert(
-                    'Trip Status Test Error',
-                    `Failed to update trip status: ${
-                      error?.message || 'Unknown error'
-                    }`
-                  );
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>🧪 {t('test_trip_status_update')}</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </ScrollView>
 
-      {/* Add Stop Modal */}
+      {/* Monitoring Setup Modal */}
       <Modal
-        visible={showAddStopModal}
+        visible={showMonitoringModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowAddStopModal(false)}
+        onRequestClose={() => setShowMonitoringModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t('add_new_stop')}</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Setup Camera Monitoring</Text>
+              <TouchableOpacity
+                onPress={() => setShowMonitoringModal(false)}
+                style={styles.closeButton}
+              >
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalDescription}>
+              Enter your camera's WiFi URL to establish monitoring connection.
+            </Text>
 
             <TextInput
               style={styles.input}
-              placeholder={t('stop_name_placeholder')}
-              value={newStop.name}
-              onChangeText={(text) =>
-                setNewStop((prev) => ({ ...prev, name: text }))
-              }
+              placeholder="Camera WiFi URL (e.g., http://192.168.1.100:8080)"
+              value={cameraWifiUrl}
+              onChangeText={setCameraWifiUrl}
+              keyboardType="url"
+              autoCapitalize="none"
             />
-
-            <TextInput
-              style={styles.input}
-              placeholder={t('latitude_placeholder')}
-              value={newStop.latitude}
-              onChangeText={(text) =>
-                setNewStop((prev) => ({ ...prev, latitude: text }))
-              }
-              keyboardType="decimal-pad"
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder={t('longitude_placeholder')}
-              value={newStop.longitude}
-              onChangeText={(text) =>
-                setNewStop((prev) => ({ ...prev, longitude: text }))
-              }
-              keyboardType="decimal-pad"
-            />
-
-            <TouchableOpacity
-              style={styles.currentLocationButton}
-              onPress={getCurrentLocation}
-            >
-              <Text style={styles.currentLocationButtonText}>
-                {t('use_current_location')}
-              </Text>
-            </TouchableOpacity>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowAddStopModal(false);
-                  setNewStop({ name: '', latitude: '', longitude: '' });
-                }}
+                onPress={() => setShowMonitoringModal(false)}
               >
-                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.addButton]}
-                onPress={addStop}
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleEnableMonitoring}
               >
-                <Text style={styles.addButtonText}>{t('add_stop')}</Text>
+                <Text style={styles.confirmButtonText}>Enable Monitoring</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Edit Stop Modal */}
+      {/* OBD Connection Modal */}
       <Modal
-        visible={!!editingStop}
+        visible={showObdModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setEditingStop(null)}
+        onRequestClose={() => setShowObdModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t('edit_stop')}</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Connect OBD Device</Text>
+              <TouchableOpacity
+                onPress={() => setShowObdModal(false)}
+                style={styles.closeButton}
+              >
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalDescription}>
+              Enter your OBD device name to establish connection.
+            </Text>
 
             <TextInput
               style={styles.input}
-              placeholder={t('stop_name_placeholder')}
-              value={editingStop?.name || ''}
-              onChangeText={(text) =>
-                setEditingStop((prev) =>
-                  prev ? { ...prev, name: text } : prev
-                )
-              }
+              placeholder="OBD Device Name (e.g., OBD-II Scanner)"
+              value={obdDeviceName}
+              onChangeText={setObdDeviceName}
+              autoCapitalize="words"
             />
-
-            <TextInput
-              style={styles.input}
-              placeholder={t('latitude_placeholder')}
-              value={editingStop?.latitude || ''}
-              onChangeText={(text) =>
-                setEditingStop((prev) =>
-                  prev ? { ...prev, latitude: text } : prev
-                )
-              }
-              keyboardType="decimal-pad"
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder={t('longitude_placeholder')}
-              value={editingStop?.longitude || ''}
-              onChangeText={(text) =>
-                setEditingStop((prev) =>
-                  prev ? { ...prev, longitude: text } : prev
-                )
-              }
-              keyboardType="decimal-pad"
-            />
-
-            <TouchableOpacity
-              style={styles.currentLocationButton}
-              onPress={getCurrentLocation}
-            >
-              <Text style={styles.currentLocationButtonText}>
-                {t('use_current_location')}
-              </Text>
-            </TouchableOpacity>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setEditingStop(null)}
+                onPress={() => setShowObdModal(false)}
               >
-                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.addButton]}
-                onPress={() => {
-                  if (!editingStop) return;
-                  const lat = parseFloat(editingStop.latitude);
-                  const lng = parseFloat(editingStop.longitude);
-                  if (!editingStop.name || isNaN(lat) || isNaN(lng)) {
-                    Alert.alert(
-                      'Invalid Input',
-                      'Please enter a valid name, latitude, and longitude.'
-                    );
-                    return;
-                  }
-                  setTripStops((prev) =>
-                    prev.map((stop) =>
-                      stop.id === editingStop.id
-                        ? {
-                            ...stop,
-                            name: editingStop.name,
-                            latitude: lat,
-                            longitude: lng,
-                          }
-                        : stop
-                    )
-                  );
-                  setEditingStop(null);
-                }}
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleConnectOBD}
               >
-                <Text style={styles.addButtonText}>{t('save_changes')}</Text>
+                <Text style={styles.confirmButtonText}>Connect Device</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1858,200 +1260,140 @@ export default function ConductorTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: {
-    padding: 30,
-    paddingTop: 60,
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  tripDetailsContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    margin: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  tripInfo: {
-    gap: 12,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
-  tripRoute: {
-    marginBottom: 8,
-  },
-  tripRouteLabel: {
-    fontSize: 14,
+  loadingText: {
+    marginTop: 16,
     color: '#64748B',
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '500',
   },
-  tripRouteValue: {
+  errorBanner: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1E293B',
-    lineHeight: 24,
-  },
-  tripDetailsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-  },
-  tripDetailItem: {
-    flex: 1,
-    minWidth: '48%',
-  },
-  tripDetailLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  tripDetailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  noTripContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 24,
-    margin: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  noTripTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  noTripSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
     marginBottom: 16,
-    lineHeight: 20,
+    paddingHorizontal: 4,
   },
-  refreshTripButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  refreshTripButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tripsListContainer: {
+  emptyContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
-    margin: 16,
+    padding: 32,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 2,
   },
-  noTripsContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  noTripsText: {
+  emptyText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 4,
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  noTripsSubtext: {
+  emptySubtext: {
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
+    lineHeight: 20,
   },
   tripCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   activeTripCard: {
-    backgroundColor: '#DBEAFE',
-    borderColor: '#3B82F6',
+    borderColor: '#10B981',
     borderWidth: 2,
+    backgroundColor: '#F0FDF4',
   },
   tripCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   tripCardInfo: {
     flex: 1,
+    marginRight: 12,
   },
   tripCardRoute: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   tripCardVehicle: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   tripCardTime: {
     fontSize: 12,
     color: '#9CA3AF',
   },
   tripStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    minWidth: 80,
+    alignItems: 'center',
   },
   tripStatusText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1F2937',
-  },
-  startTripButton: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  startTripButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  activeTripIndicator: {
-    backgroundColor: '#10B981',
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  activeTripText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    textTransform: 'capitalize',
   },
   startGPSTrackingButton: {
     backgroundColor: '#10B981',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
     marginTop: 8,
   },
@@ -2060,395 +1402,274 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#DC2626',
-    marginBottom: 8,
+  activeTripIndicator: {
+    backgroundColor: '#10B981',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginTop: 8,
   },
-  headerSubtitle: { fontSize: 16, color: '#64748B' },
-  scrollContainer: { flex: 1 },
-  locationContainer: {
+  activeTripText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  locationInfo: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
-    margin: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 4,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 12,
-  },
-  locationInfo: {
-    gap: 8,
+    elevation: 2,
   },
   addressContainer: {
     backgroundColor: '#F0F9FF',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   addressLabel: {
     fontSize: 14,
-    color: '#DC2626',
-    fontWeight: '700',
-    marginBottom: 4,
+    color: '#0369A1',
+    fontWeight: '600',
+    marginBottom: 6,
   },
   addressValue: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#1E293B',
-    fontWeight: '600',
-    lineHeight: 22,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  loadingAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  loadingAddressText: {
+    fontSize: 14,
+    color: '#0369A1',
+    fontWeight: '500',
+    marginLeft: 8,
   },
   coordinatesContainer: {
     backgroundColor: '#F8FAFC',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 8,
-  },
-  accuracyContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   locationLabel: {
     fontSize: 14,
     color: '#64748B',
     fontWeight: '600',
+    marginBottom: 4,
   },
   locationValue: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#1E293B',
     fontWeight: '500',
-    marginBottom: 8,
+    fontFamily: 'monospace',
   },
   refreshButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: '#3B82F6',
     borderRadius: 8,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     alignItems: 'center',
     marginTop: 8,
   },
   refreshButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
-  locationPlaceholder: {
+  noLocationContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  locationText: {
+  noLocationText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#6B7280',
+    marginBottom: 12,
   },
-  statusContainer: {
+  monitoringCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 2,
   },
-  statusGrid: {
+  monitoringHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statusItem: {
-    width: '48%',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  statusLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  statusValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  analyticsContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  analyticsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
     marginBottom: 16,
   },
-  analyticsItem: {
-    width: '48%',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  analyticsLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  analyticsValue: {
+  monitoringTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1E293B',
+    marginLeft: 12,
   },
-  stopsContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  stopsManagementContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  noStopsContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  noStopsText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
-  },
-  noStopsSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  stopsList: {
-    marginBottom: 16,
-  },
-  stopItem: {
+  monitoringStatus: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  stopInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    padding: 12,
+  },
+  monitoringStatusText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#166534',
     flex: 1,
   },
-  stopNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  disableButton: {
     backgroundColor: '#DC2626',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  disableButtonText: {
     color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  monitoringSetup: {
+    alignItems: 'center',
+  },
+  monitoringDescription: {
+    fontSize: 14,
+    color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 24,
-    fontSize: 12,
-    fontWeight: '600',
-    marginRight: 12,
+    marginBottom: 20,
+    lineHeight: 20,
   },
-  stopDetails: {
-    flex: 1,
-  },
-  stopName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  stopCoords: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  stopTime: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  stopStatus: {
-    alignItems: 'center',
-  },
-  stopActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  editButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 6,
-    padding: 6,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editButtonText: {
-    fontSize: 14,
-  },
-  deleteButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 6,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteButtonText: {
-    fontSize: 14,
-  },
-  statusIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    color: '#6B7280',
-    textTransform: 'capitalize',
-  },
-  stopDuration: {
-    alignItems: 'center',
-  },
-  durationText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
-  addStopButton: {
-    backgroundColor: '#DC2626',
+  enableButton: {
+    backgroundColor: '#10B981',
     borderRadius: 8,
     paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  addStopButtonText: {
+  enableButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
-  controlsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
+  obdCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  obdHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
+    marginBottom: 16,
+  },
+  obdTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginLeft: 12,
+  },
+  obdStatus: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    padding: 12,
+  },
+  obdStatusText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#166534',
+    flex: 1,
+  },
+  disconnectButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  disconnectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  obdSetup: {
+    alignItems: 'center',
+  },
+  obdDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  connectButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  connectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   button: {
     backgroundColor: '#DC2626',
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: 16,
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
     alignItems: 'center',
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  startButton: { backgroundColor: '#059669' },
-  stopButton: { backgroundColor: '#DC2626' },
+  startButton: {
+    backgroundColor: '#10B981',
+  },
+  stopButton: {
+    backgroundColor: '#DC2626',
+  },
   trackingInfo: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 14,
+    color: '#6B7280',
     textAlign: 'center',
     paddingHorizontal: 20,
-  },
-  networkStatus: {
-    position: 'absolute',
-    top: 50,
-    right: 16,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  networkStatusText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  alertsContainer: {
-    backgroundColor: '#FEF3C7',
+    lineHeight: 20,
+    backgroundColor: '#F9FAFB',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  alertsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#92400E',
-    marginBottom: 8,
-  },
-  alertText: {
-    fontSize: 12,
-    color: '#92400E',
-    marginBottom: 4,
-  },
-  recommendationsContainer: {
-    backgroundColor: '#DBEAFE',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  recommendationsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E40AF',
-    marginBottom: 8,
-  },
-  recommendationText: {
-    fontSize: 12,
-    color: '#1E40AF',
-    marginBottom: 4,
+    padding: 16,
+    marginTop: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -2458,39 +1679,65 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 24,
     margin: 20,
     width: '90%',
     maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#1E293B',
-    marginBottom: 20,
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#6B7280',
     textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
   },
   input: {
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 20,
     fontSize: 16,
     backgroundColor: '#FFFFFF',
+    color: '#1E293B',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    gap: 12,
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
-    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cancelButton: {
     backgroundColor: '#F3F4F6',
@@ -2500,46 +1747,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  addButton: {
-    backgroundColor: '#DC2626',
+  confirmButton: {
+    backgroundColor: '#10B981',
   },
-  addButtonText: {
+  confirmButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  currentLocationButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  currentLocationButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#64748B',
-    fontSize: 16,
-  },
-  debugInfo: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 12,
-  },
-  debugText: {
-    fontSize: 12,
-    color: '#92400E',
-    textAlign: 'center',
   },
 });
